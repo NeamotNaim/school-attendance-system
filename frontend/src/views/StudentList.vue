@@ -247,7 +247,13 @@ const changePage = (page) => {
 
 const editStudent = (student) => {
   editingStudent.value = student;
-  form.value = { ...student };
+  form.value = {
+    student_id: student.student_id,
+    name: student.name,
+    class: student.class,
+    section: student.section,
+    photo: null, // Don't copy the photo URL, let user upload new one if needed
+  };
 };
 
 const deleteStudent = async (id) => {
@@ -271,13 +277,15 @@ const saveStudent = async () => {
   formData.append('name', form.value.name);
   formData.append('class', form.value.class);
   formData.append('section', form.value.section);
-  if (form.value.photo) {
+  if (form.value.photo && form.value.photo instanceof File) {
     formData.append('photo', form.value.photo);
   }
 
   try {
     if (editingStudent.value) {
-      await api.put(`/students/${editingStudent.value.id}`, formData, {
+      // Laravel doesn't support PUT with FormData, use POST with _method
+      formData.append('_method', 'PUT');
+      await api.post(`/students/${editingStudent.value.id}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     } else {
@@ -288,7 +296,14 @@ const saveStudent = async () => {
     closeModal();
     fetchStudents();
   } catch (error) {
-    alert(error.response?.data?.message || 'Failed to save student');
+    const errorMsg = error.response?.data?.message || 'Failed to save student';
+    const errors = error.response?.data?.errors;
+    if (errors) {
+      const errorList = Object.values(errors).flat().join('\n');
+      alert(`${errorMsg}\n\n${errorList}`);
+    } else {
+      alert(errorMsg);
+    }
   }
 };
 
@@ -340,21 +355,21 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.875rem 1.5rem;
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 0.9375rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
 }
 
 .btn-icon {
@@ -363,11 +378,11 @@ onMounted(() => {
 }
 
 .filters-card {
-  background: var(--bg-secondary);
-  border-radius: 12px;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border-radius: 16px;
   padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-md);
   border: 1px solid var(--border-color);
 }
 
@@ -396,33 +411,37 @@ onMounted(() => {
 
 .search-input {
   width: 100%;
-  padding: 0.75rem 1rem 0.75rem 3rem;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 0.875rem 1rem 0.875rem 3rem;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
   font-size: 0.9375rem;
   background: var(--bg-secondary);
   color: var(--text-primary);
+  transition: all 0.2s ease;
 }
 
 .search-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
 }
 
 .filter-select {
-  min-width: 150px;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  min-width: 180px;
+  padding: 0.875rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
   font-size: 0.9375rem;
   background: var(--bg-secondary);
   color: var(--text-primary);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .filter-select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
 }
 
 .loading-container {
@@ -453,8 +472,8 @@ onMounted(() => {
 
 .content-card {
   background: var(--bg-secondary);
-  border-radius: 12px;
-  box-shadow: var(--shadow-md);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-color);
   overflow: hidden;
 }
@@ -553,19 +572,27 @@ td {
   width: 48px;
   height: 48px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 2px solid var(--border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.student-photo:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .photo-placeholder {
   width: 48px;
   height: 48px;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--border-color) 100%);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
+  border: 2px solid var(--border-color);
 }
 
 .photo-placeholder svg {
@@ -585,7 +612,7 @@ td {
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   padding: 0;
@@ -599,19 +626,23 @@ td {
 .btn-edit {
   background: rgba(16, 185, 129, 0.1);
   color: var(--secondary);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .btn-edit:hover {
   background: rgba(16, 185, 129, 0.2);
+  transform: scale(1.05);
 }
 
 .btn-delete {
   background: rgba(239, 68, 68, 0.1);
   color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .btn-delete:hover {
   background: rgba(239, 68, 68, 0.2);
+  transform: scale(1.05);
 }
 
 .pagination-wrapper {
@@ -671,23 +702,41 @@ td {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
   padding: 2rem;
   backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal-content {
   background: var(--bg-secondary);
-  border-radius: 12px;
+  border-radius: 16px;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-xl);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .modal-header {
@@ -706,22 +755,23 @@ td {
 }
 
 .btn-close {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg-tertiary);
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-close:hover {
-  background: var(--border-color);
-  color: var(--text-primary);
+  background: var(--danger);
+  color: white;
+  transform: rotate(90deg);
 }
 
 .btn-close svg {
@@ -760,18 +810,20 @@ td {
 
 .form-group input,
 .form-group select {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 0.875rem;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
   font-size: 0.9375rem;
   background: var(--bg-secondary);
   color: var(--text-primary);
+  transition: all 0.2s ease;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
 }
 
 .file-input {
@@ -789,12 +841,12 @@ td {
 }
 
 .btn-secondary {
-  padding: 0.75rem 1.5rem;
+  padding: 0.875rem 1.5rem;
   background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
   color: var(--text-primary);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 0.9375rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -802,6 +854,7 @@ td {
 
 .btn-secondary:hover {
   background: var(--border-color);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {
