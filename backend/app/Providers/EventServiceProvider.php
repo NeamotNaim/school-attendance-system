@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Events\AttendanceRecorded;
+use App\Events\LowAttendanceDetected;
 use App\Listeners\SendAttendanceNotification;
+use App\Listeners\SendLowAttendanceAlert;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -16,6 +18,9 @@ class EventServiceProvider extends ServiceProvider
     protected $listen = [
         AttendanceRecorded::class => [
             SendAttendanceNotification::class,
+        ],
+        LowAttendanceDetected::class => [
+            SendLowAttendanceAlert::class,
         ],
     ];
 

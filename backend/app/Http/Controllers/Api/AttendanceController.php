@@ -210,4 +210,185 @@ class AttendanceController extends Controller
             'data' => $stats,
         ]);
     }
+
+    /**
+     * Get student attendance history.
+     */
+    public function studentHistory(Request $request, string $studentId): JsonResponse
+    {
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+
+        $query = Attendance::where('student_id', $studentId)
+            ->with(['student', 'recorder'])
+            ->orderBy('date', 'desc');
+
+        if ($startDate) {
+            $query->whereDate('date', '>=', $startDate);
+        }
+
+        if ($endDate) {
+            $query->whereDate('date', '<=', $endDate);
+        }
+
+        $perPage = $request->get('per_page', 30);
+        $attendances = $query->paginate($perPage);
+
+        // Calculate summary
+        $total = $attendances->total();
+        $present = Attendance::where('student_id', $studentId)
+            ->where('status', 'present')
+            ->when($startDate, fn($q) => $q->whereDate('date', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('date', '<=', $endDate))
+            ->count();
+        $absent = Attendance::where('student_id', $studentId)
+            ->where('status', 'absent')
+            ->when($startDate, fn($q) => $q->whereDate('date', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('date', '<=', $endDate))
+            ->count();
+        $late = Attendance::where('student_id', $studentId)
+            ->where('status', 'late')
+            ->when($startDate, fn($q) => $q->whereDate('date', '>=', $startDate))
+            ->when($endDate, fn($q) => $q->whereDate('date', '<=', $endDate))
+            ->count();
+
+        return response()->json([
+            'data' => AttendanceResource::collection($attendances->items()),
+            'summary' => [
+                'total_records' => $total,
+                'present' => $present,
+                'absent' => $absent,
+                'late' => $late,
+                'attendance_percentage' => $total > 0 ? round(($present / $total) * 100, 2) : 0,
+            ],
+            'meta' => [
+                'current_page' => $attendances->currentPage(),
+                'last_page' => $attendances->lastPage(),
+                'per_page' => $attendances->perPage(),
+                'total' => $attendances->total(),
+            ],
+        ]);
+    }
+
+    /**
+     * Get daily attendance report.
+     */
+    public function dailyReport(Request $request, string $date): JsonResponse
+    {
+        $classId = $request->get('class_id');
+        $sectionId = $request->get('section_id');
+
+        $query = Attendance::whereDate('date', $date)
+            ->with(['student.schoolClass', 'student.section', 'recorder']);
+
+        if ($classId) {
+            $query->whereHas('student', function ($q) use ($classId) {
+                $q->where('class_id', $classId);
+            });
+        }
+
+        if ($sectionId) {
+            $query->whereHas('student', function ($q) use ($sectionId) {
+                $q->where('section_id', $sectionId);
+            });
+        }
+
+        $attendances = $query->get();
+
+        $summary = [
+            'date' => $date,
+            'total' => $attendances->count(),
+            'present' => $attendances->where('status', 'present')->count(),
+            'absent' => $attendances->where('status', 'absent')->count(),
+            'late' => $attendances->where('status', 'late')->count(),
+        ];
+
+        return response()->json([
+            'data' => AttendanceResource::collection($attendances),
+            'summary' => $summary,
+        ]);
+    }
+
+    /**
+     * Get comprehensive dashboard overview.
+     */
+    public function dashboardOverview(Request $request): JsonResponse
+    {
+        $today = Carbon::today()->format('Y-m-d');
+        $currentMonth = Carbon::now()->format('Y-m');
+        
+        // Today's statistics
+        $todayStats = $this->attendanceService->getAttendanceStatistics($today);
+        
+        // Weekly statistics
+        $weekStart = Carbon::now()->startOfWeek()->format('Y-m-d');
+        $weeklyReport = $this->attendanceService->generateWeeklyReport($weekStart);
+        
+        // Monthly statistics
+        $monthlyReport = $this->attendanceService->generateMonthlyReport($currentMonth);
+        
+        // Low attendance alerts
+        $lowAttendance = $this->attendanceService->getLowAttendanceStudents(75.0, $currentMonth);
+        
+        // Recent attendance (last 7 days)
+        $recentDates = [];
+        $recentStats = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i)->format('Y-m-d');
+            $stats = $this->attendanceService->getAttendanceStatistics($date);
+            $recentDates[] = $date;
+            $recentStats[] = [
+                'date' => $date,
+                'present' => $stats['present'],
+                'absent' => $stats['absent'],
+                'late' => $stats['late'],
+                'attendance_percentage' => $stats['attendance_percentage'],
+            ];
+        }
+
+        // Class-wise summary
+        $classes = \App\Models\SchoolClass::where('is_active', true)->get();
+        $classSummary = [];
+        foreach ($classes as $class) {
+            $classStats = $this->attendanceService->getAttendanceStatistics($today);
+            $classSummary[] = [
+                'class_id' => $class->id,
+                'class_name' => $class->name,
+                'total_students' => $class->students()->count(),
+                'present_today' => Attendance::whereDate('date', $today)
+                    ->whereHas('student', fn($q) => $q->where('class_id', $class->id))
+                    ->where('status', 'present')
+                    ->count(),
+            ];
+        }
+
+        return response()->json([
+            'data' => [
+                'today' => $todayStats,
+                'weekly' => [
+                    'summary' => [
+                        'total_students' => $weeklyReport['total_students'],
+                        'average_attendance' => $weeklyReport['total_students'] > 0
+                            ? round(array_sum(array_column($weeklyReport['students'], 'attendance_percentage')) / $weeklyReport['total_students'], 2)
+                            : 0,
+                    ],
+                    'daily_statistics' => $weeklyReport['daily_statistics'],
+                ],
+                'monthly' => [
+                    'summary' => [
+                        'total_students' => $monthlyReport['total_students'],
+                        'average_attendance' => $monthlyReport['total_students'] > 0
+                            ? round(array_sum(array_column($monthlyReport['students'], 'attendance_percentage')) / $monthlyReport['total_students'], 2)
+                            : 0,
+                    ],
+                ],
+                'recent_trends' => $recentStats,
+                'low_attendance_alerts' => [
+                    'count' => $lowAttendance['count'],
+                    'students' => array_slice($lowAttendance['students'], 0, 10), // Top 10
+                ],
+                'class_summary' => $classSummary,
+            ],
+        ]);
+    }
 }

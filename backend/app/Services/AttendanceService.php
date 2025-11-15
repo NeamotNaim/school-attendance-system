@@ -143,6 +143,130 @@ class AttendanceService
     }
 
     /**
+     * Generate weekly attendance report.
+     *
+     * @param string $startDate Format: Y-m-d
+     * @param string|null $classId
+     * @param string|null $sectionId
+     * @return array
+     */
+    public function generateWeeklyReport(string $startDate, ?string $classId = null, ?string $sectionId = null): array
+    {
+        $start = Carbon::parse($startDate);
+        $end = $start->copy()->addDays(6); // 7 days total
+        
+        $cacheKey = "attendance_weekly_{$startDate}_" . ($classId ?? 'all') . "_" . ($sectionId ?? 'all');
+        
+        return Cache::remember($cacheKey, 1800, function () use ($start, $end, $classId, $sectionId) {
+            $query = Student::with(['attendances' => function ($q) use ($start, $end) {
+                $q->whereBetween('date', [$start, $end])
+                  ->select('id', 'student_id', 'date', 'status', 'note');
+            }]);
+
+            if ($classId) {
+                $query->where('class_id', $classId);
+            }
+
+            if ($sectionId) {
+                $query->where('section_id', $sectionId);
+            }
+
+            $students = $query->get();
+
+            $dailyStats = [];
+            $currentDate = $start->copy();
+            while ($currentDate <= $end) {
+                $dateStr = $currentDate->format('Y-m-d');
+                $dailyStats[$dateStr] = [
+                    'date' => $dateStr,
+                    'present' => 0,
+                    'absent' => 0,
+                    'late' => 0,
+                    'total' => 0,
+                ];
+                $currentDate->addDay();
+            }
+
+            $report = [];
+            foreach ($students as $student) {
+                $presentDays = $student->attendances->where('status', 'present')->count();
+                $absentDays = $student->attendances->where('status', 'absent')->count();
+                $lateDays = $student->attendances->where('status', 'late')->count();
+                $totalDays = 7;
+                $attendancePercentage = ($presentDays / $totalDays) * 100;
+
+                // Update daily stats
+                foreach ($student->attendances as $attendance) {
+                    $dateStr = $attendance->date->format('Y-m-d');
+                    if (isset($dailyStats[$dateStr])) {
+                        $dailyStats[$dateStr]['total']++;
+                        $dailyStats[$dateStr][$attendance->status]++;
+                    }
+                }
+
+                $report[] = [
+                    'student_id' => $student->student_id,
+                    'name' => $student->name,
+                    'class' => $student->className,
+                    'section' => $student->sectionName,
+                    'present_days' => $presentDays,
+                    'absent_days' => $absentDays,
+                    'late_days' => $lateDays,
+                    'attendance_percentage' => round($attendancePercentage, 2),
+                ];
+            }
+
+            return [
+                'start_date' => $start->format('Y-m-d'),
+                'end_date' => $end->format('Y-m-d'),
+                'total_students' => count($report),
+                'daily_statistics' => array_values($dailyStats),
+                'students' => $report,
+            ];
+        });
+    }
+
+    /**
+     * Get students with low attendance.
+     *
+     * @param float $threshold Minimum attendance percentage
+     * @param string|null $month
+     * @param bool $triggerNotifications Whether to trigger notification events
+     * @return array
+     */
+    public function getLowAttendanceStudents(float $threshold = 75.0, ?string $month = null, bool $triggerNotifications = false): array
+    {
+        $month = $month ?? Carbon::now()->format('Y-m');
+        $report = $this->generateMonthlyReport($month);
+        
+        $lowAttendance = array_filter($report['students'], function ($student) use ($threshold) {
+            return $student['attendance_percentage'] < $threshold;
+        });
+
+        // Trigger notifications if requested
+        if ($triggerNotifications) {
+            foreach ($lowAttendance as $studentData) {
+                $student = Student::where('student_id', $studentData['student_id'])->first();
+                if ($student) {
+                    event(new \App\Events\LowAttendanceDetected(
+                        $student,
+                        $studentData['attendance_percentage'],
+                        $threshold,
+                        $month
+                    ));
+                }
+            }
+        }
+
+        return [
+            'month' => $month,
+            'threshold' => $threshold,
+            'count' => count($lowAttendance),
+            'students' => array_values($lowAttendance),
+        ];
+    }
+
+    /**
      * Get attendance statistics with caching.
      *
      * @param string|null $date

@@ -1,98 +1,186 @@
 <template>
   <div class="student-list">
-    <div class="header">
-      <h1>Students</h1>
-      <button @click="showAddModal = true" class="btn-primary">Add Student</button>
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Students</h1>
+        <p class="page-subtitle">Manage student information and records</p>
+      </div>
+      <button @click="showAddModal = true" class="btn-primary">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Add Student</span>
+      </button>
     </div>
 
-    <div class="filters">
-      <input
-        v-model="search"
-        type="text"
-        placeholder="Search by name or ID..."
-        @input="fetchStudents"
-      />
-      <select v-model="selectedClass" @change="fetchStudents">
-        <option value="">All Classes</option>
-        <option v-for="cls in classes" :key="cls" :value="cls">{{ cls }}</option>
-      </select>
+    <div class="filters-card">
+      <div class="filters">
+        <div class="search-wrapper">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Search by name or student ID..."
+            @input="fetchStudents"
+            class="search-input"
+          />
+        </div>
+        <select v-model="selectedClass" @change="fetchStudents" class="filter-select">
+          <option value="">All Classes</option>
+          <option v-for="cls in classes" :key="cls" :value="cls">{{ cls }}</option>
+        </select>
+      </div>
     </div>
 
-    <div v-if="loading" class="loading">Loading...</div>
-    <div v-else>
-      <table>
-        <thead>
-          <tr>
-            <th>Student ID</th>
-            <th>Name</th>
-            <th>Class</th>
-            <th>Section</th>
-            <th>Photo</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="student in students" :key="student.id">
-            <td>{{ student.student_id }}</td>
-            <td>{{ student.name }}</td>
-            <td>{{ student.class }}</td>
-            <td>{{ student.section }}</td>
-            <td>
-              <img
-                v-if="student.photo"
-                :src="student.photo"
-                alt="Student photo"
-                class="student-photo"
-              />
-              <span v-else>No photo</span>
-            </td>
-            <td>
-              <button @click="editStudent(student)" class="btn-edit">Edit</button>
-              <button @click="deleteStudent(student.id)" class="btn-delete">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-if="loading" class="loading-container">
+      <div class="spinner"></div>
+      <p>Loading students...</p>
+    </div>
 
-      <div class="pagination">
-        <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1">
-          Previous
-        </button>
-        <span>Page {{ currentPage }} of {{ totalPages }}</span>
-        <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages">
-          Next
-        </button>
+    <div v-else class="content-card">
+      <div v-if="students.length === 0" class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        <h3>No students found</h3>
+        <p>Try adjusting your search or add a new student.</p>
+      </div>
+
+      <div v-else>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Class</th>
+                <th>Section</th>
+                <th>Photo</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="student in students" :key="student.id">
+                <td class="font-mono">{{ student.student_id }}</td>
+                <td class="font-semibold">{{ student.name }}</td>
+                <td>
+                  <span class="badge badge-primary">{{ student.class }}</span>
+                </td>
+                <td>
+                  <span class="badge badge-secondary">{{ student.section }}</span>
+                </td>
+                <td>
+                  <div class="photo-wrapper">
+                    <img
+                      v-if="student.photo"
+                      :src="student.photo"
+                      alt="Student photo"
+                      class="student-photo"
+                    />
+                    <div v-else class="photo-placeholder">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <button @click="editStudent(student)" class="btn-action btn-edit" title="Edit">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                    </button>
+                    <button @click="deleteStudent(student.id)" class="btn-action btn-delete" title="Delete">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination-wrapper">
+          <div class="pagination-info">
+            Showing page {{ currentPage }} of {{ totalPages }}
+          </div>
+          <div class="pagination">
+            <button
+              @click="changePage(currentPage - 1)"
+              :disabled="currentPage === 1"
+              class="btn-pagination"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Previous
+            </button>
+            <button
+              @click="changePage(currentPage + 1)"
+              :disabled="currentPage === totalPages"
+              class="btn-pagination"
+            >
+              Next
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Add/Edit Modal -->
-    <div v-if="showAddModal || editingStudent" class="modal">
+    <div v-if="showAddModal || editingStudent" class="modal-overlay" @click.self="closeModal">
       <div class="modal-content">
-        <h2>{{ editingStudent ? 'Edit' : 'Add' }} Student</h2>
-        <form @submit.prevent="saveStudent">
+        <div class="modal-header">
+          <h2>{{ editingStudent ? 'Edit' : 'Add' }} Student</h2>
+          <button @click="closeModal" class="btn-close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <form @submit.prevent="saveStudent" class="modal-form">
           <div class="form-group">
-            <label>Student ID</label>
-            <input v-model="form.student_id" required />
+            <label>Student ID <span class="required">*</span></label>
+            <input v-model="form.student_id" required placeholder="e.g., STU001" />
           </div>
           <div class="form-group">
-            <label>Name</label>
-            <input v-model="form.name" required />
+            <label>Full Name <span class="required">*</span></label>
+            <input v-model="form.name" required placeholder="Enter student name" />
           </div>
-          <div class="form-group">
-            <label>Class</label>
-            <input v-model="form.class" required />
-          </div>
-          <div class="form-group">
-            <label>Section</label>
-            <input v-model="form.section" required />
+          <div class="form-row">
+            <div class="form-group">
+              <label>Class <span class="required">*</span></label>
+              <input v-model="form.class" required placeholder="e.g., 10" />
+            </div>
+            <div class="form-group">
+              <label>Section <span class="required">*</span></label>
+              <input v-model="form.section" required placeholder="e.g., A" />
+            </div>
           </div>
           <div class="form-group">
             <label>Photo</label>
-            <input type="file" @change="handleFileChange" accept="image/*" />
+            <input type="file" @change="handleFileChange" accept="image/*" class="file-input" />
           </div>
           <div class="modal-actions">
             <button type="button" @click="closeModal" class="btn-secondary">Cancel</button>
-            <button type="submit" class="btn-primary">Save</button>
+            <button type="submit" class="btn-primary">Save Student</button>
           </div>
         </form>
       </div>
@@ -101,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import api from '../services/api';
 
 const students = ref([]);
@@ -144,7 +232,7 @@ const fetchStudents = async () => {
 
 const fetchClasses = async () => {
   try {
-    const response = await api.get('/students');
+    const response = await api.get('/students', { params: { per_page: 1000 } });
     const allStudents = response.data.data;
     classes.value = [...new Set(allStudents.map(s => s.class))].sort();
   } catch (error) {
@@ -224,128 +312,360 @@ onMounted(() => {
 
 <style scoped>
 .student-list {
-  padding: 2rem;
+  width: 100%;
 }
 
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
-h1 {
-  margin: 0;
-  color: #333;
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.page-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.filters-card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
 }
 
 .filters {
   display: flex;
   gap: 1rem;
-  margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
 
-.filters input,
-.filters select {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-}
-
-.filters input {
+.search-wrapper {
+  position: relative;
   flex: 1;
+  min-width: 250px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.filter-select {
+  min-width: 150px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1rem;
+}
+
+.loading-container p {
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.content-card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.empty-state {
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1rem;
+  color: var(--text-muted);
+}
+
+.empty-state h3 {
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.table-container {
+  overflow-x: auto;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 thead {
-  background: #667eea;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
 }
 
-th,
-td {
+th {
   padding: 1rem;
   text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 tbody tr {
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.2s ease;
 }
 
 tbody tr:hover {
-  background: #f5f5f5;
+  background: var(--bg-tertiary);
+}
+
+td {
+  padding: 1rem;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.font-mono {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.font-semibold {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.badge-primary {
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--primary);
+}
+
+.badge-secondary {
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+}
+
+.photo-wrapper {
+  display: flex;
+  align-items: center;
 }
 
 .student-photo {
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
   object-fit: cover;
-  border-radius: 5px;
+  border-radius: 8px;
+  border: 2px solid var(--border-color);
 }
 
-.btn-primary,
-.btn-edit,
-.btn-delete,
-.btn-secondary {
-  padding: 0.5rem 1rem;
+.photo-placeholder {
+  width: 48px;
+  height: 48px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.photo-placeholder svg {
+  width: 24px;
+  height: 24px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-action {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  padding: 0;
 }
 
-.btn-primary {
-  background: #667eea;
-  color: white;
+.btn-action svg {
+  width: 18px;
+  height: 18px;
 }
 
 .btn-edit {
-  background: #10b981;
-  color: white;
-  margin-right: 0.5rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--secondary);
+}
+
+.btn-edit:hover {
+  background: rgba(16, 185, 129, 0.2);
 }
 
 .btn-delete {
-  background: #ef4444;
-  color: white;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
 }
 
-.btn-secondary {
-  background: #6b7280;
-  color: white;
+.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pagination-info {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
 .pagination {
   display: flex;
-  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-pagination {
+  display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.pagination button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #ddd;
-  background: white;
-  border-radius: 5px;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.pagination button:disabled {
+.btn-pagination:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-pagination:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.modal {
+.btn-pagination svg {
+  width: 16px;
+  height: 16px;
+}
+
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -353,49 +673,148 @@ tbody tr:hover {
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   z-index: 1000;
+  padding: 2rem;
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
-  background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  width: 90%;
-  max-width: 500px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.btn-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+.modal-form {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.required {
+  color: var(--danger);
+}
+
+.form-group input,
+.form-group select {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.file-input {
+  padding: 0.5rem;
+  font-size: 0.875rem;
 }
 
 .modal-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  margin-top: 1.5rem;
+  margin-top: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
 }
 
-.form-group {
-  margin-bottom: 1rem;
+.btn-secondary {
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  color: #555;
+.btn-secondary:hover {
+  background: var(--border-color);
 }
 
-.form-group input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-  box-sizing: border-box;
-}
-
-.loading {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .table-container {
+    overflow-x: scroll;
+  }
+  
+  .modal-overlay {
+    padding: 1rem;
+  }
 }
 </style>
-

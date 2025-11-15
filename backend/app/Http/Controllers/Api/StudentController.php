@@ -157,4 +157,28 @@ class StudentController extends Controller
             'message' => 'Student deleted successfully',
         ], 200);
     }
+
+    /**
+     * Get student attendance history.
+     */
+    public function attendanceHistory(string $id): JsonResponse
+    {
+        $student = Student::findOrFail($id);
+
+        $attendances = $student->attendances()
+            ->with('recorder')
+            ->orderBy('date', 'desc')
+            ->paginate(30);
+
+        return response()->json([
+            'student' => new StudentResource($student),
+            'data' => \App\Http\Resources\AttendanceResource::collection($attendances->items()),
+            'meta' => [
+                'current_page' => $attendances->currentPage(),
+                'last_page' => $attendances->lastPage(),
+                'per_page' => $attendances->perPage(),
+                'total' => $attendances->total(),
+            ],
+        ]);
+    }
 }
