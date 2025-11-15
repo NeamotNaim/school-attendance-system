@@ -11,19 +11,6 @@
             </svg>
             <span v-if="!sidebarCollapsed" class="brand-text">School Attendance</span>
           </div>
-          <button @click="toggleSidebar" class="sidebar-toggle" v-if="!sidebarCollapsed">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-          <button @click="toggleSidebar" class="sidebar-toggle" v-else>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
         </div>
 
         <nav class="sidebar-nav">
@@ -125,6 +112,14 @@
         </nav>
 
         <div class="sidebar-footer">
+          <button @click="toggleSidebar" class="nav-item toggle-btn">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" v-if="!sidebarCollapsed">
+              <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
+            </svg>
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" v-else>
+              <path d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>
+            </svg>
+          </button>
           <button @click="handleLogout" class="nav-item logout-btn">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -255,6 +250,12 @@ onMounted(() => {
   height: 100vh;
   z-index: 1000;
   overflow-y: auto;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar.collapsed {
@@ -264,7 +265,6 @@ onMounted(() => {
 .sidebar-header {
   padding: 1.5rem;
   display: flex;
-  justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -276,6 +276,7 @@ onMounted(() => {
   font-size: 1.25rem;
   font-weight: 700;
   color: white;
+  width: 100%;
 }
 
 .brand-icon {
@@ -287,30 +288,6 @@ onMounted(() => {
 
 .brand-text {
   white-space: nowrap;
-  overflow: hidden;
-}
-
-.sidebar-toggle {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.sidebar-toggle svg {
-  width: 18px;
-  height: 18px;
 }
 
 .sidebar-nav {
@@ -346,17 +323,7 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 60%;
-  background: white;
-  border-radius: 4px 0 0 4px;
-}
+
 
 .nav-icon {
   width: 20px;
@@ -368,6 +335,9 @@ onMounted(() => {
 .nav-item span {
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .nav-divider {
@@ -390,9 +360,23 @@ onMounted(() => {
   margin: 0;
 }
 
+.toggle-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  justify-content: flex-end;
+  padding-right: 1.5rem;
+}
+
+.toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.sidebar.collapsed .toggle-btn {
+  justify-content: center;
+  padding-right: 1.5rem;
+}
+
 .logout-btn {
-  margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.05);
 }
 
@@ -403,6 +387,8 @@ onMounted(() => {
 .sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding: 0;
+  padding-bottom: 1rem;
+  margin-top: auto;
 }
 
 /* Main Content Area */
@@ -522,21 +508,5 @@ onMounted(() => {
   }
 }
 
-/* Scrollbar Styling */
-.sidebar::-webkit-scrollbar {
-  width: 6px;
-}
 
-.sidebar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
 </style>
