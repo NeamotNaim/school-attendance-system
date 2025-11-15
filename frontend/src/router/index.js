@@ -3,6 +3,12 @@ import Login from '../views/Login.vue';
 import Dashboard from '../views/Dashboard.vue';
 import StudentList from '../views/StudentList.vue';
 import AttendanceRecording from '../views/AttendanceRecording.vue';
+import DailyReport from '../views/reports/DailyReport.vue';
+import WeeklyReport from '../views/reports/WeeklyReport.vue';
+import MonthlyReport from '../views/reports/MonthlyReport.vue';
+import Classes from '../views/Classes.vue';
+import Sections from '../views/Sections.vue';
+import Holidays from '../views/Holidays.vue';
 
 const routes = [
   {
@@ -28,6 +34,42 @@ const routes = [
     component: AttendanceRecording,
     meta: { requiresAuth: true },
   },
+  {
+    path: '/reports/daily',
+    name: 'DailyReport',
+    component: DailyReport,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/reports/weekly',
+    name: 'WeeklyReport',
+    component: WeeklyReport,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/reports/monthly',
+    name: 'MonthlyReport',
+    component: MonthlyReport,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/classes',
+    name: 'Classes',
+    component: Classes,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/sections',
+    name: 'Sections',
+    component: Sections,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/holidays',
+    name: 'Holidays',
+    component: Holidays,
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({
@@ -47,4 +89,3 @@ router.beforeEach((to, from, next) => {
 });
 
 export default router;
-
