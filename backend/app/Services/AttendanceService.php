@@ -334,16 +334,21 @@ class AttendanceService
 
         return Cache::remember($cacheKey, 1800, function () use ($date) {
             $totalStudents = Student::count();
-            $present = Attendance::where('date', $date)
+            $present = Attendance::whereDate('date', $date)
                 ->where('status', 'present')
                 ->count();
-            $absent = Attendance::where('date', $date)
+            $absent = Attendance::whereDate('date', $date)
                 ->where('status', 'absent')
                 ->count();
-            $late = Attendance::where('date', $date)
+            $late = Attendance::whereDate('date', $date)
                 ->where('status', 'late')
                 ->count();
-            $recorded = Attendance::where('date', $date)->distinct('student_id')->count();
+            $recorded = Attendance::whereDate('date', $date)->distinct('student_id')->count();
+
+            // Calculate attendance percentage based on present vs recorded
+            $attendancePercentage = $recorded > 0 
+                ? round(($present / $recorded) * 100, 2) 
+                : 0;
 
             return [
                 'date' => $date,
@@ -353,9 +358,7 @@ class AttendanceService
                 'late' => $late,
                 'recorded' => $recorded,
                 'not_recorded' => $totalStudents - $recorded,
-                'attendance_percentage' => $totalStudents > 0 
-                    ? round(($recorded / $totalStudents) * 100, 2) 
-                    : 0,
+                'attendance_percentage' => $attendancePercentage,
             ];
         });
     }

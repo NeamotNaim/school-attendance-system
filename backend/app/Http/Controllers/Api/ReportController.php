@@ -56,11 +56,12 @@ class ReportController extends Controller
     {
         $month = $request->get('month', Carbon::now()->format('Y-m'));
         
-        $classes = \App\Models\SchoolClass::where('is_active', true)->get();
+        $classes = \App\Models\SchoolClass::where('is_active', true)->orderBy('name')->get();
         $comparison = [];
 
         foreach ($classes as $class) {
-            $report = $this->attendanceService->generateMonthlyReport($month, $class->id);
+            // Use class name instead of ID
+            $report = $this->attendanceService->generateMonthlyReport($month, $class->name);
             
             $totalStudents = count($report['students']);
             $totalPresent = array_sum(array_column($report['students'], 'present_days'));
@@ -76,6 +77,7 @@ class ReportController extends Controller
                 'total_students' => $totalStudents,
                 'total_present' => $totalPresent,
                 'total_absent' => $totalAbsent,
+                'total_days' => $totalDays,
                 'average_attendance_percentage' => round($avgPercentage, 2),
             ];
         }

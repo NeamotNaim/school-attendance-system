@@ -36,7 +36,7 @@
             </div>
             <div class="stat-card-info">
               <p class="stat-label">Total Students</p>
-              <p class="stat-value">{{ stats.total_students }}</p>
+              <p class="stat-value">{{ stats.total_students || 0 }}</p>
             </div>
           </div>
         </div>
@@ -51,7 +51,7 @@
             </div>
             <div class="stat-card-info">
               <p class="stat-label">Present Today</p>
-              <p class="stat-value">{{ stats.present }}</p>
+              <p class="stat-value">{{ stats.present || 0 }}</p>
             </div>
           </div>
         </div>
@@ -67,7 +67,7 @@
             </div>
             <div class="stat-card-info">
               <p class="stat-label">Absent Today</p>
-              <p class="stat-value">{{ stats.absent }}</p>
+              <p class="stat-value">{{ stats.absent || 0 }}</p>
             </div>
           </div>
         </div>
@@ -82,7 +82,7 @@
             </div>
             <div class="stat-card-info">
               <p class="stat-label">Late Today</p>
-              <p class="stat-value">{{ stats.late }}</p>
+              <p class="stat-value">{{ stats.late || 0 }}</p>
             </div>
           </div>
         </div>
@@ -97,7 +97,7 @@
             </div>
             <div class="stat-card-info">
               <p class="stat-label">Attendance Rate</p>
-              <p class="stat-value">{{ stats.attendance_percentage }}%</p>
+              <p class="stat-value">{{ stats.attendance_percentage || 0 }}%</p>
             </div>
           </div>
         </div>
@@ -115,7 +115,7 @@
             </div>
             <div class="stat-card-info">
               <p class="stat-label">Recorded</p>
-              <p class="stat-value">{{ stats.recorded }} / {{ stats.total_students }}</p>
+              <p class="stat-value">{{ stats.recorded || 0 }} / {{ stats.total_students || 0 }}</p>
             </div>
           </div>
         </div>
@@ -150,6 +150,7 @@ const stats = ref({
   absent: 0,
   late: 0,
   recorded: 0,
+  not_recorded: 0,
   attendance_percentage: 0,
 });
 const loading = ref(true);
@@ -167,9 +168,30 @@ const currentDate = computed(() => {
 const fetchStatistics = async () => {
   try {
     const response = await api.get('/attendances/statistics');
-    stats.value = response.data.data;
+    const data = response.data.data;
+    
+    // Ensure all values have defaults
+    stats.value = {
+      total_students: data.total_students || 0,
+      present: data.present || 0,
+      absent: data.absent || 0,
+      late: data.late || 0,
+      recorded: data.recorded || 0,
+      not_recorded: data.not_recorded || 0,
+      attendance_percentage: data.attendance_percentage || 0,
+    };
   } catch (error) {
     console.error('Failed to fetch statistics:', error);
+    // Set default values on error
+    stats.value = {
+      total_students: 0,
+      present: 0,
+      absent: 0,
+      late: 0,
+      recorded: 0,
+      not_recorded: 0,
+      attendance_percentage: 0,
+    };
   } finally {
     loading.value = false;
   }
