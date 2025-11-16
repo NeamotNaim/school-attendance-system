@@ -121,6 +121,12 @@
                 </td>
                 <td>
                   <div class="action-buttons">
+                    <button @click="viewStudent(student)" class="btn-action btn-view" title="View">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </button>
                     <button @click="editStudent(student)" class="btn-action btn-edit" title="Edit">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -130,7 +136,7 @@
                     <button @click="deleteStudent(student.id)" class="btn-action btn-delete" title="Delete">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 4 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                       </svg>
                     </button>
                   </div>
@@ -176,10 +182,7 @@
         <div class="modal-header">
           <h2>{{ editingStudent ? 'Edit' : 'Add' }} Student</h2>
           <button @click="closeModal" class="btn-close">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
+            <span class="close-icon">×</span>
           </button>
         </div>
         <form @submit.prevent="saveStudent" class="modal-form">
@@ -222,6 +225,82 @@
         </form>
       </div>
     </div>
+
+    <!-- View Student Modal -->
+    <div v-if="viewingStudent" class="modal-overlay" @click.self="closeViewModal">
+      <div class="modal-content view-modal">
+        <div class="modal-header">
+          <h2>Student Details</h2>
+          <button @click="closeViewModal" class="btn-close">
+            <span class="close-icon">×</span>
+          </button>
+        </div>
+        <div class="view-content">
+          <div class="view-photo-section">
+            <div class="view-photo-wrapper">
+              <img
+                v-if="viewingStudent.photo"
+                :src="viewingStudent.photo"
+                alt="Student photo"
+                class="view-photo"
+              />
+              <div v-else class="view-photo-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+            </div>
+          </div>
+          
+          <div class="view-details">
+            <div class="detail-row">
+              <div class="detail-item">
+                <label>Student ID</label>
+                <p class="font-mono">{{ viewingStudent.student_id }}</p>
+              </div>
+              <div class="detail-item">
+                <label>Full Name</label>
+                <p>{{ viewingStudent.name }}</p>
+              </div>
+            </div>
+            
+            <div class="detail-row">
+              <div class="detail-item">
+                <label>Class</label>
+                <p><span class="badge badge-primary">{{ viewingStudent.class }}</span></p>
+              </div>
+              <div class="detail-item">
+                <label>Section</label>
+                <p><span class="badge badge-secondary">{{ viewingStudent.section }}</span></p>
+              </div>
+            </div>
+            
+            <div class="detail-row">
+              <div class="detail-item">
+                <label>Enrollment Date</label>
+                <p>{{ formatDate(viewingStudent.created_at) }}</p>
+              </div>
+              <div class="detail-item">
+                <label>Last Updated</label>
+                <p>{{ formatDate(viewingStudent.updated_at) }}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="view-actions">
+            <button @click="editFromView" class="btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Edit Student
+            </button>
+            <button @click="closeViewModal" class="btn-secondary">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -250,6 +329,7 @@ const totalPages = ref(1);
 const totalStudents = ref(0);
 const showAddModal = ref(false);
 const editingStudent = ref(null);
+const viewingStudent = ref(null);
 const form = ref({
   student_id: '',
   name: '',
@@ -356,6 +436,30 @@ const clearFilters = () => {
 const changePage = (page) => {
   currentPage.value = page;
   fetchStudents();
+};
+
+const viewStudent = (student) => {
+  viewingStudent.value = student;
+};
+
+const closeViewModal = () => {
+  viewingStudent.value = null;
+};
+
+const editFromView = () => {
+  const student = viewingStudent.value;
+  closeViewModal();
+  editStudent(student);
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 };
 
 const editStudent = (student) => {
@@ -826,6 +930,17 @@ td {
   height: 18px;
 }
 
+.btn-view {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.btn-view:hover {
+  background: rgba(59, 130, 246, 0.2);
+  transform: scale(1.05);
+}
+
 .btn-edit {
   background: rgba(16, 185, 129, 0.1);
   color: var(--secondary);
@@ -958,28 +1073,38 @@ td {
 }
 
 .btn-close {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-tertiary);
-  border: none;
-  border-radius: 8px;
-  color: var(--text-secondary);
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  color: #24cb48ff;
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .btn-close:hover {
-  background: var(--danger);
+  background: #850b0bff;
+  border-color: #ef4444;
   color: white;
-  transform: rotate(90deg);
+  transform: rotate(90deg) scale(1.05);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
-.btn-close svg {
-  width: 20px;
-  height: 20px;
+.close-icon {
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 300;
+  color: #ef4444;
+  display: block;
+}
+
+.btn-close:hover .close-icon {
+  color: white;
 }
 
 .modal-form {
@@ -1067,6 +1192,104 @@ td {
   transform: translateY(-1px);
 }
 
+/* View Modal Styles */
+.view-modal {
+  max-width: 600px;
+}
+
+.view-content {
+  padding: 1.5rem;
+}
+
+.view-photo-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.view-photo-wrapper {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid var(--primary);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+}
+
+.view-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.view-photo-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view-photo-placeholder svg {
+  width: 60px;
+  height: 60px;
+  color: white;
+}
+
+.view-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.detail-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-item label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.detail-item p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.view-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.view-actions .btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.view-actions .btn-primary svg {
+  width: 16px;
+  height: 16px;
+}
+
 @media (max-width: 768px) {
   .form-row {
     grid-template-columns: 1fr;
@@ -1078,6 +1301,20 @@ td {
   
   .modal-overlay {
     padding: 1rem;
+  }
+  
+  .detail-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .view-actions {
+    flex-direction: column-reverse;
+  }
+  
+  .view-actions button {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>
