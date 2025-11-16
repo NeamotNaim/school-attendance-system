@@ -80,10 +80,17 @@
         <button @click="markAllAbsent" class="btn-bulk btn-bulk-absent" :disabled="students.length === 0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="8" x2="12" y2="12"></line>
-            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
           </svg>
           Mark All Absent
+        </button>
+        <button @click="markAllLate" class="btn-bulk btn-bulk-late" :disabled="students.length === 0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          Mark All Late
         </button>
       </div>
     </div>
@@ -266,15 +273,20 @@ const loadStudents = async () => {
     const response = await api.get('/students', { params: { ...params, per_page: 1000 } });
     students.value = response.data.data;
 
-    // Initialize attendance data
-    attendanceData.value = {};
+    // Initialize attendance data - use a fresh object to ensure reactivity
+    const newAttendanceData = {};
     students.value.forEach((student) => {
-      attendanceData.value[student.id] = {
+      newAttendanceData[student.id] = {
         student_id: student.id,
         status: 'present',
         note: '',
       };
     });
+    
+    // Assign all at once to trigger reactivity
+    attendanceData.value = newAttendanceData;
+    
+    console.log('Initialized attendance data for', Object.keys(attendanceData.value).length, 'students');
 
     // Load existing attendance if any
     await loadExistingAttendance();
@@ -302,17 +314,28 @@ const loadExistingAttendance = async () => {
       },
     });
     
+    console.log('Existing attendance response:', response.data);
+    
     if (response.data.data && response.data.data.length > 0) {
+      let loadedCount = 0;
       response.data.data.forEach((record) => {
-        if (attendanceData.value[record.student_id]) {
-          attendanceData.value[record.student_id].status = record.status;
-          attendanceData.value[record.student_id].note = record.note || '';
+        // The record has student_id field directly
+        const studentId = record.student_id;
+        
+        if (attendanceData.value[studentId]) {
+          attendanceData.value[studentId].status = record.status;
+          attendanceData.value[studentId].note = record.note || '';
+          loadedCount++;
         }
       });
+      
+      if (loadedCount > 0) {
+        console.log(`Loaded existing attendance for ${loadedCount} students`);
+      }
     }
   } catch (error) {
     // No existing attendance, that's fine
-    console.log('No existing attendance found');
+    console.log('No existing attendance found:', error.response?.status);
   }
 };
 
@@ -396,13 +419,52 @@ const markAllAbsent = () => {
   updateAttendancePercentage();
 };
 
+const markAllLate = () => {
+  Object.keys(attendanceData.value).forEach((key) => {
+    attendanceData.value[key].status = 'late';
+  });
+  updateAttendancePercentage();
+};
+
 const updateAttendancePercentage = () => {
   // Reactive, updates automatically
 };
 
 const saveAttendance = async () => {
+  // Validation checks
   if (students.value.length === 0) {
-    alert('No students to save');
+    alert('No students to save. Please load students first.');
+    return;
+  }
+
+  if (!attendanceData.value || Object.keys(attendanceData.value).length === 0) {
+    alert('No attendance data to save. Please load students first.');
+    return;
+  }
+  
+  // Check if attendance data matches students
+  if (Object.keys(attendanceData.value).length !== students.value.length) {
+    console.warn('Attendance data mismatch:', {
+      attendanceDataCount: Object.keys(attendanceData.value).length,
+      studentsCount: students.value.length,
+    });
+    alert('Attendance data is not ready. Please wait a moment and try again.');
+    return;
+  }
+
+  if (!selectedDate.value) {
+    alert('Please select a date.');
+    return;
+  }
+
+  if (!selectedClass.value || !selectedSection.value) {
+    alert('Please select both class and section.');
+    return;
+  }
+
+  // Prevent double submission
+  if (saving.value) {
+    console.log('Already saving, please wait...');
     return;
   }
 
@@ -414,15 +476,45 @@ const saveAttendance = async () => {
       note: data.note || null,
     }));
 
-    await api.post('/attendances/bulk', {
+    console.log('Attendance data structure:', attendanceData.value);
+    console.log('Students data to send:', studentsData);
+    console.log('Saving attendance:', {
       date: selectedDate.value,
-      students: studentsData,
+      class: selectedClass.value,
+      section: selectedSection.value,
+      students: studentsData.length,
+      firstStudent: studentsData[0],
     });
 
-    alert('Attendance saved successfully!');
-    loadStudents();
+    const payload = {
+      date: selectedDate.value,
+      students: studentsData,
+    };
+    
+    console.log('Full payload:', JSON.stringify(payload, null, 2));
+
+    const response = await api.post('/attendances/bulk', payload);
+
+    console.log('Save response:', response.data);
+    
+    alert(`✓ Attendance saved successfully!\n\nDate: ${selectedDate.value}\nClass: ${selectedClass.value} - Section ${selectedSection.value}\nStudents: ${studentsData.length}`);
+    
+    // Reload to show updated data
+    await loadStudents();
   } catch (error) {
-    alert(error.response?.data?.message || 'Failed to save attendance');
+    console.error('Save attendance error:', error);
+    
+    const errorMessage = error.response?.data?.message || 'Failed to save attendance';
+    const errors = error.response?.data?.errors;
+    
+    if (errors) {
+      const errorDetails = Object.entries(errors)
+        .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+        .join('\n');
+      alert(`❌ ${errorMessage}\n\nDetails:\n${errorDetails}`);
+    } else {
+      alert(`❌ ${errorMessage}\n\nPlease try again.`);
+    }
   } finally {
     saving.value = false;
   }
@@ -627,6 +719,17 @@ onMounted(() => {
 .btn-bulk-absent:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+}
+
+.btn-bulk-late {
+  background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-bulk-late:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
 }
 
 .btn-bulk:disabled {
