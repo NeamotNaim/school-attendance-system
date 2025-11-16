@@ -167,11 +167,21 @@
           <div class="form-row">
             <div class="form-group">
               <label>Class <span class="required">*</span></label>
-              <input v-model="form.class" required placeholder="e.g., 10" />
+              <select v-model="form.class" @change="onClassChange" required>
+                <option value="">Select Class</option>
+                <option v-for="cls in classes" :key="cls.id" :value="cls.name">
+                  {{ cls.name }}
+                </option>
+              </select>
             </div>
             <div class="form-group">
               <label>Section <span class="required">*</span></label>
-              <input v-model="form.section" required placeholder="e.g., A" />
+              <select v-model="form.section" required :disabled="!form.class">
+                <option value="">Select Section</option>
+                <option v-for="section in sections" :key="section.id" :value="section.name">
+                  {{ section.name }}
+                </option>
+              </select>
             </div>
           </div>
           <div class="form-group">
@@ -199,6 +209,8 @@ const { confirm } = useConfirm();
 
 const students = ref([]);
 const classes = ref([]);
+const sections = ref([]);
+const allSections = ref([]);
 const loading = ref(false);
 const search = ref('');
 const selectedClass = ref('');
@@ -237,12 +249,39 @@ const fetchStudents = async () => {
 
 const fetchClasses = async () => {
   try {
-    const response = await api.get('/students', { params: { per_page: 1000 } });
-    const allStudents = response.data.data;
-    classes.value = [...new Set(allStudents.map(s => s.class))].sort();
+    const response = await api.get('/classes');
+    classes.value = response.data.data.filter(c => c.is_active);
   } catch (error) {
     console.error('Failed to fetch classes:', error);
   }
+};
+
+const fetchSections = async () => {
+  try {
+    const response = await api.get('/sections');
+    allSections.value = response.data.data;
+    updateAvailableSections();
+  } catch (error) {
+    console.error('Failed to fetch sections:', error);
+  }
+};
+
+const updateAvailableSections = () => {
+  if (form.value.class) {
+    const selectedClassObj = classes.value.find(c => c.name === form.value.class);
+    if (selectedClassObj) {
+      sections.value = allSections.value.filter(s => s.class_id === selectedClassObj.id);
+    } else {
+      sections.value = [];
+    }
+  } else {
+    sections.value = [];
+  }
+};
+
+const onClassChange = () => {
+  form.value.section = '';
+  updateAvailableSections();
 };
 
 const changePage = (page) => {
@@ -259,6 +298,7 @@ const editStudent = (student) => {
     section: student.section,
     photo: null, // Don't copy the photo URL, let user upload new one if needed
   };
+  updateAvailableSections();
 };
 
 const deleteStudent = async (id) => {
@@ -337,6 +377,7 @@ const closeModal = () => {
 onMounted(() => {
   fetchStudents();
   fetchClasses();
+  fetchSections();
 });
 </script>
 
@@ -839,6 +880,13 @@ td {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
   outline: none;
+}
+
+.form-group select:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .file-input {

@@ -5,6 +5,34 @@
         <h1 class="page-title">Monthly Report</h1>
         <p class="page-subtitle">View monthly attendance statistics</p>
       </div>
+      <div class="export-buttons" v-if="report && report.students && report.students.length > 0">
+        <button @click="handleExport('csv')" class="btn-export">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+          CSV
+        </button>
+        <button @click="handleExport('excel')" class="btn-export">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          Excel
+        </button>
+        <button @click="handleExport('pdf')" class="btn-export">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          PDF
+        </button>
+      </div>
     </div>
 
     <div class="filters-card">
@@ -99,6 +127,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import api from '../../services/api';
+import { useExport } from '../../composables/useExport';
+
+const { exportToCSV, exportToExcel, exportToPDF } = useExport();
 
 const selectedMonth = ref(new Date().toISOString().slice(0, 7));
 const selectedClass = ref('');
@@ -164,6 +195,37 @@ const getAttendanceClass = (percentage) => {
   return 'text-danger';
 };
 
+const handleExport = (format) => {
+  if (!report.value || !report.value.students || report.value.students.length === 0) {
+    return;
+  }
+
+  const exportData = report.value.students.map((item) => ({
+    'Student ID': item.student_id || '',
+    'Name': item.name || '',
+    'Class': item.class || '',
+    'Section': item.section || '',
+    'Present Days': item.present_days || 0,
+    'Absent Days': item.absent_days || 0,
+    'Late Days': item.late_days || 0,
+    'Recorded Days': item.recorded_days || 0,
+    'School Days': item.total_days || 0,
+    'Attendance %': item.attendance_percentage || 0,
+    'Month': selectedMonth.value,
+  }));
+
+  const filename = `Monthly_Report_${selectedMonth.value}${selectedClass.value ? `_Class_${selectedClass.value}` : ''}${selectedSection.value ? `_Section_${selectedSection.value}` : ''}`;
+  const title = `Monthly Attendance Report - ${selectedMonth.value}`;
+
+  if (format === 'csv') {
+    exportToCSV(exportData, filename);
+  } else if (format === 'excel') {
+    exportToExcel(exportData, filename, title);
+  } else if (format === 'pdf') {
+    exportToPDF(exportData, filename, title);
+  }
+};
+
 onMounted(() => {
   fetchClasses();
   fetchReport();
@@ -176,7 +238,45 @@ onMounted(() => {
 }
 
 .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-export {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: white;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-export:hover {
+  background: var(--primary);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-export svg {
+  width: 16px;
+  height: 16px;
 }
 
 .page-title {
