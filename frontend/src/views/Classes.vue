@@ -101,6 +101,11 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import api from '../services/api';
+import { useToast } from '../composables/useToast';
+import { useConfirm } from '../composables/useConfirm';
+
+const toast = useToast();
+const { confirm } = useConfirm();
 
 const classes = ref([]);
 const loading = ref(false);
@@ -133,12 +138,22 @@ const editClass = (cls) => {
 };
 
 const deleteClass = async (id) => {
-  if (!confirm('Are you sure you want to delete this class?')) return;
+  const confirmed = await confirm({
+    title: 'Delete Class?',
+    message: 'This will permanently delete this class and all associated sections and attendance records. This action cannot be undone.',
+    type: 'danger',
+    confirmText: 'Delete Class',
+    cancelText: 'Cancel',
+  });
+
+  if (!confirmed) return;
+
   try {
     await api.delete(`/classes/${id}`);
+    toast.success('Class deleted successfully!');
     fetchClasses();
   } catch (error) {
-    alert('Failed to delete class');
+    toast.error('Failed to delete class. Please try again.');
   }
 };
 
@@ -146,13 +161,15 @@ const saveClass = async () => {
   try {
     if (editingClass.value) {
       await api.put(`/classes/${editingClass.value.id}`, form.value);
+      toast.success('Class updated successfully!');
     } else {
       await api.post('/classes', form.value);
+      toast.success('Class added successfully!');
     }
     closeModal();
     fetchClasses();
   } catch (error) {
-    alert(error.response?.data?.message || 'Failed to save class');
+    toast.error(error.response?.data?.message || 'Failed to save class');
   }
 };
 

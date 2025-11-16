@@ -105,6 +105,11 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import api from '../services/api';
+import { useToast } from '../composables/useToast';
+import { useConfirm } from '../composables/useConfirm';
+
+const toast = useToast();
+const { confirm } = useConfirm();
 
 const sections = ref([]);
 const classes = ref([]);
@@ -147,12 +152,22 @@ const editSection = (section) => {
 };
 
 const deleteSection = async (id) => {
-  if (!confirm('Are you sure you want to delete this section?')) return;
+  const confirmed = await confirm({
+    title: 'Delete Section?',
+    message: 'This will permanently delete this section and all associated student attendance records. This action cannot be undone.',
+    type: 'danger',
+    confirmText: 'Delete Section',
+    cancelText: 'Cancel',
+  });
+
+  if (!confirmed) return;
+
   try {
     await api.delete(`/sections/${id}`);
+    toast.success('Section deleted successfully!');
     fetchSections();
   } catch (error) {
-    alert('Failed to delete section');
+    toast.error('Failed to delete section. Please try again.');
   }
 };
 
@@ -160,13 +175,15 @@ const saveSection = async () => {
   try {
     if (editingSection.value) {
       await api.put(`/sections/${editingSection.value.id}`, form.value);
+      toast.success('Section updated successfully!');
     } else {
       await api.post('/sections', form.value);
+      toast.success('Section added successfully!');
     }
     closeModal();
     fetchSections();
   } catch (error) {
-    alert(error.response?.data?.message || 'Failed to save section');
+    toast.error(error.response?.data?.message || 'Failed to save section');
   }
 };
 

@@ -191,6 +191,11 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import api from '../services/api';
+import { useToast } from '../composables/useToast';
+import { useConfirm } from '../composables/useConfirm';
+
+const toast = useToast();
+const { confirm } = useConfirm();
 
 const students = ref([]);
 const classes = ref([]);
@@ -257,13 +262,22 @@ const editStudent = (student) => {
 };
 
 const deleteStudent = async (id) => {
-  if (!confirm('Are you sure you want to delete this student?')) return;
+  const confirmed = await confirm({
+    title: 'Delete Student?',
+    message: 'This will permanently delete this student and all their attendance records. This action cannot be undone.',
+    type: 'danger',
+    confirmText: 'Delete Student',
+    cancelText: 'Cancel',
+  });
+
+  if (!confirmed) return;
   
   try {
     await api.delete(`/students/${id}`);
+    toast.success('Student deleted successfully!');
     fetchStudents();
   } catch (error) {
-    alert('Failed to delete student');
+    toast.error('Failed to delete student. Please try again.');
   }
 };
 
@@ -293,16 +307,17 @@ const saveStudent = async () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     }
+    toast.success(editingStudent.value ? 'Student updated successfully!' : 'Student added successfully!');
     closeModal();
     fetchStudents();
   } catch (error) {
     const errorMsg = error.response?.data?.message || 'Failed to save student';
     const errors = error.response?.data?.errors;
     if (errors) {
-      const errorList = Object.values(errors).flat().join('\n');
-      alert(`${errorMsg}\n\n${errorList}`);
+      const errorList = Object.values(errors).flat().join(', ');
+      toast.error(`${errorMsg}: ${errorList}`);
     } else {
-      alert(errorMsg);
+      toast.error(errorMsg);
     }
   }
 };

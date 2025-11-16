@@ -228,6 +228,9 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import api from '../services/api';
+import { useToast } from '../composables/useToast';
+
+const toast = useToast();
 
 const students = ref([]);
 const classes = ref([]);
@@ -299,7 +302,7 @@ const loadStudents = async () => {
     }
   } catch (error) {
     console.error('Failed to load students:', error);
-    alert('Failed to load students. Please try again.');
+    toast.error('Failed to load students. Please try again.');
   } finally {
     loading.value = false;
   }
@@ -433,12 +436,12 @@ const updateAttendancePercentage = () => {
 const saveAttendance = async () => {
   // Validation checks
   if (students.value.length === 0) {
-    alert('No students to save. Please load students first.');
+    toast.warning('No students to save. Please load students first.');
     return;
   }
 
   if (!attendanceData.value || Object.keys(attendanceData.value).length === 0) {
-    alert('No attendance data to save. Please load students first.');
+    toast.warning('No attendance data to save. Please load students first.');
     return;
   }
   
@@ -448,17 +451,17 @@ const saveAttendance = async () => {
       attendanceDataCount: Object.keys(attendanceData.value).length,
       studentsCount: students.value.length,
     });
-    alert('Attendance data is not ready. Please wait a moment and try again.');
+    toast.warning('Attendance data is not ready. Please wait a moment and try again.');
     return;
   }
 
   if (!selectedDate.value) {
-    alert('Please select a date.');
+    toast.warning('Please select a date.');
     return;
   }
 
   if (!selectedClass.value || !selectedSection.value) {
-    alert('Please select both class and section.');
+    toast.warning('Please select both class and section.');
     return;
   }
 
@@ -497,7 +500,7 @@ const saveAttendance = async () => {
 
     console.log('Save response:', response.data);
     
-    alert(`✓ Attendance saved successfully!\n\nDate: ${selectedDate.value}\nClass: ${selectedClass.value} - Section ${selectedSection.value}\nStudents: ${studentsData.length}`);
+    toast.success(`Attendance saved successfully for ${studentsData.length} students!`, 'Success');
     
     // Reload to show updated data
     await loadStudents();
@@ -510,10 +513,10 @@ const saveAttendance = async () => {
     if (errors) {
       const errorDetails = Object.entries(errors)
         .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
-        .join('\n');
-      alert(`❌ ${errorMessage}\n\nDetails:\n${errorDetails}`);
+        .join(', ');
+      toast.error(`${errorMessage}: ${errorDetails}`);
     } else {
-      alert(`❌ ${errorMessage}\n\nPlease try again.`);
+      toast.error(errorMessage);
     }
   } finally {
     saving.value = false;

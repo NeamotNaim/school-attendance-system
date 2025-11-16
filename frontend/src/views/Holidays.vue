@@ -168,6 +168,11 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import api from '../services/api';
+import { useToast } from '../composables/useToast';
+import { useConfirm } from '../composables/useConfirm';
+
+const toast = useToast();
+const { confirm } = useConfirm();
 
 const holidays = ref([]);
 const loading = ref(false);
@@ -218,12 +223,22 @@ const editHoliday = (holiday) => {
 };
 
 const deleteHoliday = async (id) => {
-  if (!confirm('Are you sure you want to delete this holiday?')) return;
+  const confirmed = await confirm({
+    title: 'Delete Holiday?',
+    message: 'This will permanently delete this holiday from the calendar. This action cannot be undone.',
+    type: 'danger',
+    confirmText: 'Delete Holiday',
+    cancelText: 'Cancel',
+  });
+
+  if (!confirmed) return;
+
   try {
     await api.delete(`/holidays/${id}`);
+    toast.success('Holiday deleted successfully!');
     fetchHolidays();
   } catch (error) {
-    alert('Failed to delete holiday');
+    toast.error('Failed to delete holiday. Please try again.');
   }
 };
 
@@ -231,13 +246,15 @@ const saveHoliday = async () => {
   try {
     if (editingHoliday.value) {
       await api.put(`/holidays/${editingHoliday.value.id}`, form.value);
+      toast.success('Holiday updated successfully!');
     } else {
       await api.post('/holidays', form.value);
+      toast.success('Holiday added successfully!');
     }
     closeModal();
     fetchHolidays();
   } catch (error) {
-    alert(error.response?.data?.message || 'Failed to save holiday');
+    toast.error(error.response?.data?.message || 'Failed to save holiday');
   }
 };
 
