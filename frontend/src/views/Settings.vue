@@ -244,6 +244,11 @@
 
 <script setup>
 import { reactive, onMounted } from 'vue';
+import { useToast } from '../composables/useToast';
+import { useConfirm } from '../composables/useConfirm';
+
+const toast = useToast();
+const { confirm } = useConfirm();
 
 const settings = reactive({
   theme: 'light',
@@ -269,25 +274,29 @@ const loadSettings = () => {
 
 const saveSettings = () => {
   localStorage.setItem('app_settings', JSON.stringify(settings));
-  showNotification('Settings saved successfully!');
+  toast.success('Your settings have been saved!');
 };
 
 const exportData = () => {
-  showNotification('Data export started. You will receive an email when ready.');
+  toast.info('Data export started. You will receive an email when ready.', 'Export Started');
 };
 
-const clearCache = () => {
-  if (confirm('Are you sure you want to clear the cache? This will refresh the page.')) {
+const clearCache = async () => {
+  const confirmed = await confirm({
+    title: 'Clear Cache?',
+    message: 'This will clear all cached data and refresh the page. Are you sure you want to continue?',
+    type: 'warning',
+    confirmText: 'Clear Cache',
+    cancelText: 'Cancel',
+  });
+
+  if (confirmed) {
     localStorage.removeItem('app_cache');
-    showNotification('Cache cleared successfully!');
+    toast.success('Cache cleared successfully! Refreshing page...');
     setTimeout(() => {
       window.location.reload();
     }, 1000);
   }
-};
-
-const showNotification = (message) => {
-  alert(message);
 };
 
 onMounted(() => {

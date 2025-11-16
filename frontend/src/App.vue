@@ -1,5 +1,7 @@
 <template>
   <div id="app">
+    <Toast />
+    <ConfirmDialog />
     <div v-if="isAuthenticated" class="app-layout">
       <!-- Sidebar -->
       <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
@@ -227,6 +229,8 @@
 import { computed, ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api from './services/api';
+import Toast from './components/Toast.vue';
+import ConfirmDialog from './components/ConfirmDialog.vue';
 
 const router = useRouter();
 const route = useRoute();

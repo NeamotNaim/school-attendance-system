@@ -183,6 +183,9 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
+import { useToast } from '../composables/useToast';
+
+const toast = useToast();
 
 const router = useRouter();
 const editMode = ref(false);
@@ -271,10 +274,10 @@ const saveProfile = async () => {
     localStorage.setItem('user', JSON.stringify(user));
     
     editMode.value = false;
-    alert('Profile updated successfully!');
+    toast.success('Your profile has been updated successfully!');
   } catch (error) {
     console.error('Error saving profile:', error);
-    alert('Failed to update profile. Please try again.');
+    toast.error('Failed to update profile. Please try again.');
   } finally {
     saving.value = false;
   }
@@ -282,12 +285,12 @@ const saveProfile = async () => {
 
 const changePassword = async () => {
   if (passwordData.new_password !== passwordData.confirm_password) {
-    alert('New passwords do not match!');
+    toast.error('New passwords do not match!');
     return;
   }
 
   if (passwordData.new_password.length < 6) {
-    alert('Password must be at least 6 characters long!');
+    toast.warning('Password must be at least 6 characters long!');
     return;
   }
 
@@ -296,13 +299,13 @@ const changePassword = async () => {
     // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
     
-    alert('Password changed successfully!');
+    toast.success('Your password has been changed successfully!');
     passwordData.current_password = '';
     passwordData.new_password = '';
     passwordData.confirm_password = '';
   } catch (error) {
     console.error('Error changing password:', error);
-    alert('Failed to change password. Please try again.');
+    toast.error('Failed to change password. Please try again.');
   } finally {
     changingPassword.value = false;
   }
