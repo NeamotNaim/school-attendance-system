@@ -15,9 +15,16 @@
         </div>
         <div class="form-group">
           <label>Class</label>
-          <select v-model="selectedClass" @change="fetchReport">
+          <select v-model="selectedClass" @change="onClassChange">
             <option value="">All Classes</option>
-            <option v-for="cls in classes" :key="cls" :value="cls">{{ cls }}</option>
+            <option v-for="cls in classes" :key="cls" :value="cls">Class {{ cls }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Section</label>
+          <select v-model="selectedSection" @change="fetchReport" :disabled="!selectedClass">
+            <option value="">All Sections</option>
+            <option v-for="section in sections" :key="section" :value="section">Section {{ section }}</option>
           </select>
         </div>
       </div>
@@ -89,7 +96,9 @@ import api from '../../services/api';
 
 const selectedDate = ref(new Date().toISOString().split('T')[0]);
 const selectedClass = ref('');
+const selectedSection = ref('');
 const classes = ref([]);
+const sections = ref([]);
 const loading = ref(false);
 const report = ref(null);
 
@@ -98,9 +107,11 @@ const fetchReport = async () => {
   
   loading.value = true;
   try {
-    const response = await api.get(`/attendances/daily/${selectedDate.value}`, {
-      params: { class: selectedClass.value },
-    });
+    const params = {};
+    if (selectedClass.value) params.class = selectedClass.value;
+    if (selectedSection.value) params.section = selectedSection.value;
+    
+    const response = await api.get(`/attendances/daily/${selectedDate.value}`, { params });
     report.value = response.data;
   } catch (error) {
     console.error('Failed to fetch report:', error);
@@ -117,6 +128,28 @@ const fetchClasses = async () => {
   } catch (error) {
     console.error('Failed to fetch classes:', error);
   }
+};
+
+const fetchSections = async () => {
+  if (!selectedClass.value) {
+    sections.value = [];
+    return;
+  }
+  
+  try {
+    const response = await api.get('/students', {
+      params: { class: selectedClass.value, per_page: 1000 },
+    });
+    sections.value = [...new Set(response.data.data.map(s => s.section))].sort();
+  } catch (error) {
+    console.error('Failed to fetch sections:', error);
+  }
+};
+
+const onClassChange = () => {
+  selectedSection.value = '';
+  fetchSections();
+  fetchReport();
 };
 
 onMounted(() => {

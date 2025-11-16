@@ -15,9 +15,16 @@
         </div>
         <div class="form-group">
           <label>Class</label>
-          <select v-model="selectedClass" @change="fetchReport">
+          <select v-model="selectedClass" @change="onClassChange">
             <option value="">All Classes</option>
-            <option v-for="cls in classes" :key="cls" :value="cls">{{ cls }}</option>
+            <option v-for="cls in classes" :key="cls" :value="cls">Class {{ cls }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Section</label>
+          <select v-model="selectedSection" @change="fetchReport" :disabled="!selectedClass">
+            <option value="">All Sections</option>
+            <option v-for="section in sections" :key="section" :value="section">Section {{ section }}</option>
           </select>
         </div>
       </div>
@@ -60,7 +67,8 @@
                 <th>Present</th>
                 <th>Absent</th>
                 <th>Late</th>
-                <th>Total Days</th>
+                <th>Recorded Days</th>
+                <th>School Days</th>
                 <th>Attendance %</th>
               </tr>
             </thead>
@@ -72,6 +80,7 @@
                 <td class="text-success">{{ student.present_days }}</td>
                 <td class="text-danger">{{ student.absent_days }}</td>
                 <td class="text-warning">{{ student.late_days }}</td>
+                <td>{{ student.recorded_days || 0 }}</td>
                 <td>{{ student.total_days }}</td>
                 <td>
                   <strong :class="getAttendanceClass(student.attendance_percentage)">
@@ -93,7 +102,9 @@ import api from '../../services/api';
 
 const selectedMonth = ref(new Date().toISOString().slice(0, 7));
 const selectedClass = ref('');
+const selectedSection = ref('');
 const classes = ref([]);
+const sections = ref([]);
 const loading = ref(false);
 const report = ref(null);
 
@@ -102,12 +113,11 @@ const fetchReport = async () => {
   
   loading.value = true;
   try {
-    const response = await api.get('/reports/monthly', {
-      params: { 
-        month: selectedMonth.value,
-        class_id: selectedClass.value,
-      },
-    });
+    const params = { month: selectedMonth.value };
+    if (selectedClass.value) params.class = selectedClass.value;
+    if (selectedSection.value) params.section = selectedSection.value;
+    
+    const response = await api.get('/reports/monthly', { params });
     report.value = response.data.data;
   } catch (error) {
     console.error('Failed to fetch report:', error);
@@ -124,6 +134,28 @@ const fetchClasses = async () => {
   } catch (error) {
     console.error('Failed to fetch classes:', error);
   }
+};
+
+const fetchSections = async () => {
+  if (!selectedClass.value) {
+    sections.value = [];
+    return;
+  }
+  
+  try {
+    const response = await api.get('/students', {
+      params: { class: selectedClass.value, per_page: 1000 },
+    });
+    sections.value = [...new Set(response.data.data.map(s => s.section))].sort();
+  } catch (error) {
+    console.error('Failed to fetch sections:', error);
+  }
+};
+
+const onClassChange = () => {
+  selectedSection.value = '';
+  fetchSections();
+  fetchReport();
 };
 
 const getAttendanceClass = (percentage) => {

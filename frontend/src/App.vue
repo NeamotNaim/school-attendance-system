@@ -135,6 +135,13 @@
       <div class="main-wrapper">
         <header class="top-header">
           <div class="header-content">
+            <button @click="toggleSidebar" class="mobile-menu-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
             <h1 class="page-title">{{ currentPageTitle }}</h1>
             <div class="header-actions">
               <div class="user-info">
@@ -219,6 +226,15 @@ onMounted(() => {
   if (window.innerWidth < 1024) {
     sidebarCollapsed.value = true;
   }
+  
+  // Add window resize listener
+  window.addEventListener('resize', () => {
+    if (window.innerWidth < 1024) {
+      sidebarCollapsed.value = true;
+    } else {
+      sidebarCollapsed.value = false;
+    }
+  });
 });
 </script>
 
@@ -462,23 +478,47 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+.mobile-menu-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-btn:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.mobile-menu-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
+  .mobile-menu-btn {
+    display: flex;
+  }
+
   .sidebar {
-    transform: translateX(-100%);
+    transform: translateX(0);
   }
   
   .sidebar.collapsed {
-    transform: translateX(0);
-    width: 80px;
+    transform: translateX(-100%);
   }
   
   .main-wrapper {
     margin-left: 0;
-  }
-  
-  .sidebar.collapsed ~ .main-wrapper {
-    margin-left: 80px;
   }
 }
 

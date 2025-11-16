@@ -30,29 +30,43 @@
               <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
               <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
             </svg>
-            Class
+            Class <span class="required">*</span>
           </label>
-          <select v-model="selectedClass" @change="loadStudents">
+          <select v-model="selectedClass" @change="watchClass">
             <option value="">Select Class</option>
-            <option v-for="cls in classes" :key="cls" :value="cls">{{ cls }}</option>
+            <option v-for="cls in classes" :key="cls" :value="cls">Class {{ cls }}</option>
           </select>
         </div>
         <div class="form-group">
           <label>
             <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="3" x2="9" y2="21"></line>
             </svg>
-            Section
+            Section <span class="required">*</span>
           </label>
           <select v-model="selectedSection" @change="loadStudents" :disabled="!selectedClass">
-            <option value="">All Sections</option>
+            <option value="">Select Section</option>
             <option v-for="section in sections" :key="section" :value="section">
-              {{ section }}
+              Section {{ section }}
             </option>
           </select>
+        </div>
+        <div class="form-group">
+          <label style="opacity: 0;">Action</label>
+          <button 
+            @click="loadStudents" 
+            :disabled="!selectedClass || !selectedSection"
+            class="btn-load"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Load Students
+          </button>
         </div>
       </div>
       <div class="bulk-actions">
@@ -132,15 +146,42 @@
                 <td class="font-mono">{{ student.student_id }}</td>
                 <td class="font-semibold">{{ student.name }}</td>
                 <td>
-                  <select
-                    v-model="attendanceData[student.id].status"
-                    @change="updateAttendancePercentage"
-                    :class="`status-select status-${attendanceData[student.id].status}`"
-                  >
-                    <option value="present">Present</option>
-                    <option value="absent">Absent</option>
-                    <option value="late">Late</option>
-                  </select>
+                  <div class="status-buttons">
+                    <button
+                      @click="attendanceData[student.id].status = 'present'"
+                      :class="['status-btn', 'status-btn-present', { active: attendanceData[student.id].status === 'present' }]"
+                      title="Mark Present"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
+                      <span>P</span>
+                    </button>
+                    <button
+                      @click="attendanceData[student.id].status = 'absent'"
+                      :class="['status-btn', 'status-btn-absent', { active: attendanceData[student.id].status === 'absent' }]"
+                      title="Mark Absent"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                      </svg>
+                      <span>A</span>
+                    </button>
+                    <button
+                      @click="attendanceData[student.id].status = 'late'"
+                      :class="['status-btn', 'status-btn-late', { active: attendanceData[student.id].status === 'late' }]"
+                      title="Mark Late"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                      <span>L</span>
+                    </button>
+                  </div>
                 </td>
                 <td>
                   <input
@@ -190,6 +231,7 @@ const selectedSection = ref('');
 const loading = ref(false);
 const saving = ref(false);
 const attendanceData = ref({});
+const hasExistingAttendance = ref(false);
 
 const presentCount = computed(() => {
   return Object.values(attendanceData.value).filter(a => a.status === 'present').length;
@@ -224,6 +266,8 @@ const loadStudents = async () => {
     const response = await api.get('/students', { params: { ...params, per_page: 1000 } });
     students.value = response.data.data;
 
+    // Initialize attendance data
+    attendanceData.value = {};
     students.value.forEach((student) => {
       attendanceData.value[student.id] = {
         student_id: student.id,
@@ -232,23 +276,109 @@ const loadStudents = async () => {
       };
     });
 
-    sections.value = [
-      ...new Set(students.value.map((s) => s.section)),
-    ].sort();
+    // Load existing attendance if any
+    await loadExistingAttendance();
+
+    // Update sections list
+    if (!selectedSection.value) {
+      sections.value = [
+        ...new Set(students.value.map((s) => s.section)),
+      ].sort();
+    }
   } catch (error) {
     console.error('Failed to load students:', error);
+    alert('Failed to load students. Please try again.');
   } finally {
     loading.value = false;
   }
 };
 
+const loadExistingAttendance = async () => {
+  try {
+    const response = await api.get(`/attendances/daily/${selectedDate.value}`, {
+      params: {
+        class: selectedClass.value,
+        section: selectedSection.value || undefined,
+      },
+    });
+    
+    if (response.data.data && response.data.data.length > 0) {
+      response.data.data.forEach((record) => {
+        if (attendanceData.value[record.student_id]) {
+          attendanceData.value[record.student_id].status = record.status;
+          attendanceData.value[record.student_id].note = record.note || '';
+        }
+      });
+    }
+  } catch (error) {
+    // No existing attendance, that's fine
+    console.log('No existing attendance found');
+  }
+};
+
 const fetchClasses = async () => {
+  try {
+    // Try to get from classes API first
+    const classResponse = await api.get('/classes');
+    if (classResponse.data.data && classResponse.data.data.length > 0) {
+      classes.value = classResponse.data.data
+        .filter(c => c.is_active)
+        .map(c => c.name)
+        .sort();
+      return;
+    }
+  } catch (error) {
+    console.log('Classes API not available, falling back to students');
+  }
+
+  // Fallback to getting classes from students
   try {
     const response = await api.get('/students', { params: { per_page: 1000 } });
     const allStudents = response.data.data;
     classes.value = [...new Set(allStudents.map((s) => s.class))].sort();
   } catch (error) {
     console.error('Failed to fetch classes:', error);
+  }
+};
+
+const fetchSections = async () => {
+  if (!selectedClass.value) {
+    sections.value = [];
+    return;
+  }
+
+  try {
+    // Try sections API first
+    try {
+      const response = await api.get('/sections');
+      if (response.data.data && response.data.data.length > 0) {
+        // Filter sections by class name
+        const classSections = response.data.data.filter(s => {
+          return s.is_active && s.class && s.class.name === selectedClass.value;
+        });
+        
+        if (classSections.length > 0) {
+          sections.value = classSections.map(s => s.name).sort();
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('Sections API not available, using fallback');
+    }
+
+    // Fallback: get sections from students
+    const response = await api.get('/students', {
+      params: { class: selectedClass.value, per_page: 1000 },
+    });
+    
+    if (response.data.data && response.data.data.length > 0) {
+      sections.value = [...new Set(response.data.data.map((s) => s.section))].sort();
+    } else {
+      sections.value = [];
+    }
+  } catch (error) {
+    console.error('Failed to fetch sections:', error);
+    sections.value = [];
   }
 };
 
@@ -298,6 +428,28 @@ const saveAttendance = async () => {
   }
 };
 
+// Watch for class changes to load sections
+const watchClass = async () => {
+  if (selectedClass.value) {
+    selectedSection.value = '';
+    students.value = [];
+    await fetchSections();
+  } else {
+    sections.value = [];
+    selectedSection.value = '';
+    students.value = [];
+  }
+};
+
+// Add quick toggle for individual student
+const toggleStatus = (studentId) => {
+  const current = attendanceData.value[studentId].status;
+  const statuses = ['present', 'absent', 'late'];
+  const currentIndex = statuses.indexOf(current);
+  const nextIndex = (currentIndex + 1) % statuses.length;
+  attendanceData.value[studentId].status = statuses[nextIndex];
+};
+
 onMounted(() => {
   fetchClasses();
 });
@@ -325,11 +477,11 @@ onMounted(() => {
 }
 
 .controls-card {
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-md);
   border: 1px solid var(--border-color);
 }
 
@@ -373,9 +525,9 @@ onMounted(() => {
 
 .form-group input,
 .form-group select {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 0.875rem;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
   font-size: 0.9375rem;
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -386,6 +538,44 @@ onMounted(() => {
 .form-group select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
+}
+
+.required {
+  color: var(--danger);
+}
+
+.btn-load {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  width: 100%;
+}
+
+.btn-load:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+}
+
+.btn-load:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-load svg {
+  width: 18px;
+  height: 18px;
 }
 
 .form-group select:disabled {
@@ -403,13 +593,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.875rem 1.5rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 0.9375rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .btn-bulk svg {
@@ -420,26 +610,29 @@ onMounted(() => {
 .btn-bulk-present {
   background: linear-gradient(135deg, var(--secondary) 0%, #059669 100%);
   color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .btn-bulk-present:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
 }
 
 .btn-bulk-absent {
   background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
   color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .btn-bulk-absent:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
 }
 
 .btn-bulk:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .loading-container,
@@ -486,10 +679,10 @@ onMounted(() => {
 
 .summary-card {
   background: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-color);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -500,10 +693,17 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 1rem;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  border-left: 4px solid var(--primary);
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+  border-radius: 12px;
+  border-left: 5px solid var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.summary-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .summary-present {
@@ -539,11 +739,11 @@ onMounted(() => {
 
 .table-card {
   background: var(--bg-secondary);
-  border-radius: 12px;
-  box-shadow: var(--shadow-md);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-color);
   overflow: hidden;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .table-container {
@@ -601,40 +801,69 @@ td {
   color: var(--text-primary);
 }
 
-.status-select {
+.status-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.status-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
   background: var(--bg-secondary);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
-  min-width: 120px;
+  min-width: 60px;
+  justify-content: center;
 }
 
-.status-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+.status-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
-.status-present {
-  background: rgba(16, 185, 129, 0.1);
+.status-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.status-btn-present {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.status-btn-present.active {
+  background: linear-gradient(135deg, var(--secondary) 0%, #059669 100%);
   border-color: var(--secondary);
-  color: var(--secondary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-.status-absent {
-  background: rgba(239, 68, 68, 0.1);
+.status-btn-absent {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-btn-absent.active {
+  background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
   border-color: var(--danger);
-  color: var(--danger);
+  color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
-.status-late {
-  background: rgba(245, 158, 11, 0.1);
+.status-btn-late {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.status-btn-late.active {
+  background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
   border-color: var(--warning);
-  color: var(--warning);
+  color: white;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
 .note-input {
@@ -656,13 +885,13 @@ td {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  box-shadow: var(--shadow-sm);
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-color);
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .action-info p {
@@ -680,26 +909,27 @@ td {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.875rem 2rem;
+  padding: 1rem 2.5rem;
   background: linear-gradient(135deg, var(--secondary) 0%, #059669 100%);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .btn-save:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
 }
 
 .btn-save:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .btn-save svg {
