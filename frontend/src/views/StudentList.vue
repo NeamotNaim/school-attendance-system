@@ -15,6 +15,16 @@
     </div>
 
     <div class="filters-card">
+      <div class="filters-header">
+        <h3>Filters</h3>
+        <button v-if="hasActiveFilters" @click="clearFilters" class="btn-clear-filters">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          Clear Filters
+        </button>
+      </div>
       <div class="filters">
         <div class="search-wrapper">
           <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -29,10 +39,27 @@
             class="search-input"
           />
         </div>
-        <select v-model="selectedClass" @change="fetchStudents" class="filter-select">
-          <option value="">All Classes</option>
-          <option v-for="cls in classes" :key="cls" :value="cls">{{ cls }}</option>
-        </select>
+        <div class="filter-group">
+          <label>Class</label>
+          <select v-model="selectedClass" @change="onClassFilterChange" class="filter-select">
+            <option value="">All Classes</option>
+            <option v-for="cls in availableClasses" :key="cls.id" :value="cls.name">
+              {{ cls.name }}
+            </option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Section</label>
+          <select v-model="selectedSection" @change="fetchStudents" class="filter-select" :disabled="!selectedClass">
+            <option value="">All Sections</option>
+            <option v-for="section in availableSections" :key="section.id" :value="section.name">
+              {{ section.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-summary" v-if="students.length > 0">
+        <p>Showing <strong>{{ students.length }}</strong> of <strong>{{ totalStudents }}</strong> students</p>
       </div>
     </div>
 
@@ -199,7 +226,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import api from '../services/api';
 import { useToast } from '../composables/useToast';
 import { useConfirm } from '../composables/useConfirm';
@@ -211,12 +238,16 @@ const students = ref([]);
 const classes = ref([]);
 const sections = ref([]);
 const allSections = ref([]);
+const availableClasses = ref([]);
+const availableSections = ref([]);
 const loading = ref(false);
 const search = ref('');
 const selectedClass = ref('');
+const selectedSection = ref('');
 const currentPage = ref(1);
 const perPage = ref(15);
 const totalPages = ref(1);
+const totalStudents = ref(0);
 const showAddModal = ref(false);
 const editingStudent = ref(null);
 const form = ref({
@@ -225,6 +256,10 @@ const form = ref({
   class: '',
   section: '',
   photo: null,
+});
+
+const hasActiveFilters = computed(() => {
+  return search.value || selectedClass.value || selectedSection.value;
 });
 
 const fetchStudents = async () => {
@@ -236,10 +271,12 @@ const fetchStudents = async () => {
     };
     if (search.value) params.search = search.value;
     if (selectedClass.value) params.class = selectedClass.value;
+    if (selectedSection.value) params.section = selectedSection.value;
 
     const response = await api.get('/students', { params });
     students.value = response.data.data;
     totalPages.value = response.data.meta.last_page;
+    totalStudents.value = response.data.meta.total;
   } catch (error) {
     console.error('Failed to fetch students:', error);
   } finally {
@@ -250,7 +287,9 @@ const fetchStudents = async () => {
 const fetchClasses = async () => {
   try {
     const response = await api.get('/classes');
-    classes.value = response.data.data.filter(c => c.is_active);
+    const activeClasses = response.data.data.filter(c => c.is_active);
+    classes.value = activeClasses;
+    availableClasses.value = activeClasses;
   } catch (error) {
     console.error('Failed to fetch classes:', error);
   }
@@ -261,8 +300,22 @@ const fetchSections = async () => {
     const response = await api.get('/sections');
     allSections.value = response.data.data;
     updateAvailableSections();
+    updateFilterSections();
   } catch (error) {
     console.error('Failed to fetch sections:', error);
+  }
+};
+
+const updateFilterSections = () => {
+  if (selectedClass.value) {
+    const selectedClassObj = availableClasses.value.find(c => c.name === selectedClass.value);
+    if (selectedClassObj) {
+      availableSections.value = allSections.value.filter(s => s.class_id === selectedClassObj.id);
+    } else {
+      availableSections.value = [];
+    }
+  } else {
+    availableSections.value = [];
   }
 };
 
@@ -282,6 +335,22 @@ const updateAvailableSections = () => {
 const onClassChange = () => {
   form.value.section = '';
   updateAvailableSections();
+};
+
+const onClassFilterChange = () => {
+  selectedSection.value = '';
+  updateFilterSections();
+  currentPage.value = 1;
+  fetchStudents();
+};
+
+const clearFilters = () => {
+  search.value = '';
+  selectedClass.value = '';
+  selectedSection.value = '';
+  currentPage.value = 1;
+  availableSections.value = [];
+  fetchStudents();
 };
 
 const changePage = (page) => {
@@ -442,10 +511,81 @@ onMounted(() => {
   border: 1px solid var(--border-color);
 }
 
+.filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.filters-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.btn-clear-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-clear-filters:hover {
+  background: var(--bg-primary);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-clear-filters svg {
+  width: 14px;
+  height: 14px;
+}
+
 .filters {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 180px;
+}
+
+.filter-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.filter-summary {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.filter-summary p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.filter-summary strong {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .search-wrapper {
@@ -498,6 +638,13 @@ onMounted(() => {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
   outline: none;
+}
+
+.filter-select:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .loading-container {
