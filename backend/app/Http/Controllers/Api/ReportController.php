@@ -18,58 +18,15 @@ class ReportController extends Controller
     }
 
     /**
-     * Get daily attendance report.
-     */
-    public function daily(Request $request): JsonResponse
-    {
-        $date = $request->get('date', Carbon::today()->format('Y-m-d'));
-        $classId = $request->get('class_id');
-        $sectionId = $request->get('section_id');
-
-        $query = \App\Models\Attendance::whereDate('date', $date)
-            ->with(['student.schoolClass', 'student.section', 'recorder']);
-
-        if ($classId) {
-            $query->whereHas('student', function ($q) use ($classId) {
-                $q->where('class_id', $classId);
-            });
-        }
-
-        if ($sectionId) {
-            $query->whereHas('student', function ($q) use ($sectionId) {
-                $q->where('section_id', $sectionId);
-            });
-        }
-
-        $attendances = $query->get();
-
-        $summary = [
-            'date' => $date,
-            'total' => $attendances->count(),
-            'present' => $attendances->where('status', 'present')->count(),
-            'absent' => $attendances->where('status', 'absent')->count(),
-            'late' => $attendances->where('status', 'late')->count(),
-            'attendance_percentage' => $attendances->count() > 0 
-                ? round(($attendances->where('status', 'present')->count() / $attendances->count()) * 100, 2)
-                : 0,
-        ];
-
-        return response()->json([
-            'data' => \App\Http\Resources\AttendanceResource::collection($attendances),
-            'summary' => $summary,
-        ]);
-    }
-
-    /**
      * Get weekly attendance report.
      */
     public function weekly(Request $request): JsonResponse
     {
         $startDate = $request->get('start_date', Carbon::now()->startOfWeek()->format('Y-m-d'));
-        $classId = $request->get('class_id');
-        $sectionId = $request->get('section_id');
+        $class = $request->get('class');
+        $section = $request->get('section');
 
-        $report = $this->attendanceService->generateWeeklyReport($startDate, $classId, $sectionId);
+        $report = $this->attendanceService->generateWeeklyReport($startDate, $class, $section);
 
         return response()->json([
             'data' => $report,
@@ -83,8 +40,9 @@ class ReportController extends Controller
     {
         $month = $request->get('month', Carbon::now()->format('Y-m'));
         $class = $request->get('class');
+        $section = $request->get('section');
 
-        $report = $this->attendanceService->generateMonthlyReport($month, $class);
+        $report = $this->attendanceService->generateMonthlyReport($month, $class, $section);
 
         return response()->json([
             'data' => $report,

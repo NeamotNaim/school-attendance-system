@@ -275,21 +275,21 @@ class AttendanceController extends Controller
      */
     public function dailyReport(Request $request, string $date): JsonResponse
     {
-        $classId = $request->get('class_id');
-        $sectionId = $request->get('section_id');
+        $class = $request->get('class');
+        $section = $request->get('section');
 
         $query = Attendance::whereDate('date', $date)
-            ->with(['student.schoolClass', 'student.section', 'recorder']);
+            ->with(['student', 'recorder']);
 
-        if ($classId) {
-            $query->whereHas('student', function ($q) use ($classId) {
-                $q->where('class_id', $classId);
+        if ($class) {
+            $query->whereHas('student', function ($q) use ($class) {
+                $q->where('class', $class);
             });
         }
 
-        if ($sectionId) {
-            $query->whereHas('student', function ($q) use ($sectionId) {
-                $q->where('section_id', $sectionId);
+        if ($section) {
+            $query->whereHas('student', function ($q) use ($section) {
+                $q->where('section', $section);
             });
         }
 
@@ -297,7 +297,7 @@ class AttendanceController extends Controller
 
         $summary = [
             'date' => $date,
-            'total' => $attendances->count(),
+            'total_students' => $attendances->count(),
             'present' => $attendances->where('status', 'present')->count(),
             'absent' => $attendances->where('status', 'absent')->count(),
             'late' => $attendances->where('status', 'late')->count(),

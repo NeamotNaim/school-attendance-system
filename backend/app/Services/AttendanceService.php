@@ -90,13 +90,14 @@ class AttendanceService
      *
      * @param string $month Format: Y-m (e.g., 2024-01)
      * @param string|null $class
+     * @param string|null $section
      * @return array
      */
-    public function generateMonthlyReport(string $month, ?string $class = null): array
+    public function generateMonthlyReport(string $month, ?string $class = null, ?string $section = null): array
     {
-        $cacheKey = "attendance_report_{$month}_" . ($class ?? 'all');
+        $cacheKey = "attendance_report_{$month}_" . ($class ?? 'all') . "_" . ($section ?? 'all');
         
-        return Cache::remember($cacheKey, 3600, function () use ($month, $class) {
+        return Cache::remember($cacheKey, 3600, function () use ($month, $class, $section) {
             $startDate = Carbon::parse($month . '-01')->startOfMonth();
             $endDate = $startDate->copy()->endOfMonth();
 
@@ -109,22 +110,48 @@ class AttendanceService
                 $query->where('class', $class);
             }
 
+            if ($section) {
+                $query->where('section', $section);
+            }
+
             $students = $query->get();
+
+            // Get total school days (days when attendance was recorded)
+            $schoolDays = Attendance::whereBetween('date', [$startDate, $endDate])
+                ->distinct('date')
+                ->count('date');
+
+            // If no attendance recorded yet, use current date as reference
+            if ($schoolDays === 0) {
+                $today = Carbon::today();
+                if ($today->between($startDate, $endDate)) {
+                    $schoolDays = $startDate->diffInDays($today) + 1;
+                } else if ($today->greaterThan($endDate)) {
+                    $schoolDays = $startDate->diffInDays($endDate) + 1;
+                } else {
+                    $schoolDays = 1; // Future month
+                }
+            }
 
             $report = [];
             foreach ($students as $student) {
-                $totalDays = $startDate->diffInDays($endDate) + 1;
                 $presentDays = $student->attendances->where('status', 'present')->count();
                 $absentDays = $student->attendances->where('status', 'absent')->count();
                 $lateDays = $student->attendances->where('status', 'late')->count();
-                $attendancePercentage = $totalDays > 0 ? ($presentDays / $totalDays) * 100 : 0;
+                $recordedDays = $presentDays + $absentDays + $lateDays;
+                
+                // Calculate attendance percentage based on recorded days
+                $attendancePercentage = $recordedDays > 0 
+                    ? ($presentDays / $recordedDays) * 100 
+                    : 0;
 
                 $report[] = [
                     'student_id' => $student->student_id,
                     'name' => $student->name,
                     'class' => $student->class,
                     'section' => $student->section,
-                    'total_days' => $totalDays,
+                    'total_days' => $schoolDays,
+                    'recorded_days' => $recordedDays,
                     'present_days' => $presentDays,
                     'absent_days' => $absentDays,
                     'late_days' => $lateDays,
@@ -136,8 +163,15 @@ class AttendanceService
             return [
                 'month' => $month,
                 'class' => $class,
+                'section' => $section,
                 'total_students' => count($report),
                 'students' => $report,
+                'summary' => [
+                    'total_students' => count($report),
+                    'total_present' => array_sum(array_column($report, 'present_days')),
+                    'total_absent' => array_sum(array_column($report, 'absent_days')),
+                    'total_late' => array_sum(array_column($report, 'late_days')),
+                ],
             ];
         });
     }
@@ -146,29 +180,29 @@ class AttendanceService
      * Generate weekly attendance report.
      *
      * @param string $startDate Format: Y-m-d
-     * @param string|null $classId
-     * @param string|null $sectionId
+     * @param string|null $class
+     * @param string|null $section
      * @return array
      */
-    public function generateWeeklyReport(string $startDate, ?string $classId = null, ?string $sectionId = null): array
+    public function generateWeeklyReport(string $startDate, ?string $class = null, ?string $section = null): array
     {
         $start = Carbon::parse($startDate);
         $end = $start->copy()->addDays(6); // 7 days total
         
-        $cacheKey = "attendance_weekly_{$startDate}_" . ($classId ?? 'all') . "_" . ($sectionId ?? 'all');
+        $cacheKey = "attendance_weekly_{$startDate}_" . ($class ?? 'all') . "_" . ($section ?? 'all');
         
-        return Cache::remember($cacheKey, 1800, function () use ($start, $end, $classId, $sectionId) {
+        return Cache::remember($cacheKey, 1800, function () use ($start, $end, $class, $section) {
             $query = Student::with(['attendances' => function ($q) use ($start, $end) {
                 $q->whereBetween('date', [$start, $end])
                   ->select('id', 'student_id', 'date', 'status', 'note');
             }]);
 
-            if ($classId) {
-                $query->where('class_id', $classId);
+            if ($class) {
+                $query->where('class', $class);
             }
 
-            if ($sectionId) {
-                $query->where('section_id', $sectionId);
+            if ($section) {
+                $query->where('section', $section);
             }
 
             $students = $query->get();
@@ -193,22 +227,27 @@ class AttendanceService
                 $absentDays = $student->attendances->where('status', 'absent')->count();
                 $lateDays = $student->attendances->where('status', 'late')->count();
                 $totalDays = 7;
-                $attendancePercentage = ($presentDays / $totalDays) * 100;
+                $attendancePercentage = $totalDays > 0 ? ($presentDays / $totalDays) * 100 : 0;
 
                 // Update daily stats
                 foreach ($student->attendances as $attendance) {
-                    $dateStr = $attendance->date->format('Y-m-d');
+                    $dateStr = is_string($attendance->date) 
+                        ? $attendance->date 
+                        : $attendance->date->format('Y-m-d');
+                    
                     if (isset($dailyStats[$dateStr])) {
                         $dailyStats[$dateStr]['total']++;
-                        $dailyStats[$dateStr][$attendance->status]++;
+                        if (isset($dailyStats[$dateStr][$attendance->status])) {
+                            $dailyStats[$dateStr][$attendance->status]++;
+                        }
                     }
                 }
 
                 $report[] = [
                     'student_id' => $student->student_id,
                     'name' => $student->name,
-                    'class' => $student->className,
-                    'section' => $student->sectionName,
+                    'class' => $student->class,
+                    'section' => $student->section,
                     'present_days' => $presentDays,
                     'absent_days' => $absentDays,
                     'late_days' => $lateDays,
@@ -216,12 +255,28 @@ class AttendanceService
                 ];
             }
 
+            // Calculate attendance percentage for daily stats
+            foreach ($dailyStats as $dateStr => &$stats) {
+                if ($stats['total'] > 0) {
+                    $stats['attendance_percentage'] = round(($stats['present'] / $stats['total']) * 100, 2);
+                } else {
+                    $stats['attendance_percentage'] = 0;
+                }
+            }
+            unset($stats); // Break reference
+
             return [
                 'start_date' => $start->format('Y-m-d'),
                 'end_date' => $end->format('Y-m-d'),
-                'total_students' => count($report),
-                'daily_statistics' => array_values($dailyStats),
+                'total_students' => count($students),
+                'daily_stats' => array_values($dailyStats),
                 'students' => $report,
+                'summary' => [
+                    'total_students' => count($students),
+                    'average_present' => count($report) > 0 ? round(array_sum(array_column($report, 'present_days')) / count($report), 2) : 0,
+                    'average_absent' => count($report) > 0 ? round(array_sum(array_column($report, 'absent_days')) / count($report), 2) : 0,
+                    'average_late' => count($report) > 0 ? round(array_sum(array_column($report, 'late_days')) / count($report), 2) : 0,
+                ],
             ];
         });
     }
