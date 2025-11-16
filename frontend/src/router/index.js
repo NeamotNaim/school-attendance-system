@@ -9,6 +9,8 @@ import MonthlyReport from '../views/reports/MonthlyReport.vue';
 import Classes from '../views/Classes.vue';
 import Sections from '../views/Sections.vue';
 import Holidays from '../views/Holidays.vue';
+import Profile from '../views/Profile.vue';
+import Settings from '../views/Settings.vue';
 
 const routes = [
   {
@@ -68,6 +70,18 @@ const routes = [
     path: '/holidays',
     name: 'Holidays',
     component: Holidays,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: Profile,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: Settings,
     meta: { requiresAuth: true },
   },
 ];

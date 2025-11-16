@@ -144,12 +144,70 @@
             </button>
             <h1 class="page-title">{{ currentPageTitle }}</h1>
             <div class="header-actions">
-              <div class="user-info">
-                <svg class="user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-                <span>{{ userName }}</span>
+              <div class="user-profile" @click="toggleProfileMenu" v-click-outside="closeProfileMenu">
+                <div class="user-info">
+                  <div class="user-avatar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                  </div>
+                  <div class="user-details">
+                    <span class="user-name">{{ userName }}</span>
+                    <span class="user-role">{{ userRole }}</span>
+                  </div>
+                  <svg class="dropdown-icon" :class="{ open: showProfileMenu }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+                
+                <transition name="dropdown">
+                  <div v-if="showProfileMenu" class="profile-dropdown">
+                    <div class="dropdown-header">
+                      <div class="dropdown-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                      </div>
+                      <div class="dropdown-user-info">
+                        <p class="dropdown-name">{{ userName }}</p>
+                        <p class="dropdown-email">{{ userEmail }}</p>
+                      </div>
+                    </div>
+                    
+                    <div class="dropdown-divider"></div>
+                    
+                    <div class="dropdown-menu">
+                      <button @click="goToProfile" class="dropdown-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <span>My Profile</span>
+                      </button>
+                      
+                      <button @click="goToSettings" class="dropdown-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="3"></circle>
+                          <path d="M12 1v6m0 6v6m5.2-13.2l-4.2 4.2m0 6l4.2 4.2M23 12h-6m-6 0H1m18.2 5.2l-4.2-4.2m0-6l-4.2-4.2"></path>
+                        </svg>
+                        <span>Settings</span>
+                      </button>
+                      
+                      <div class="dropdown-divider"></div>
+                      
+                      <button @click="handleLogout" class="dropdown-item logout">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                          <polyline points="16 17 21 12 16 7"></polyline>
+                          <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  </div>
+                </transition>
               </div>
             </div>
           </div>
@@ -173,6 +231,7 @@ import api from './services/api';
 const router = useRouter();
 const route = useRoute();
 const sidebarCollapsed = ref(false);
+const showProfileMenu = ref(false);
 
 const isAuthenticated = computed(() => {
   return !!localStorage.getItem('auth_token');
@@ -190,6 +249,30 @@ const userName = computed(() => {
   return 'User';
 });
 
+const userEmail = computed(() => {
+  const user = localStorage.getItem('user');
+  if (user) {
+    try {
+      return JSON.parse(user).email || 'user@example.com';
+    } catch {
+      return 'user@example.com';
+    }
+  }
+  return 'user@example.com';
+});
+
+const userRole = computed(() => {
+  const user = localStorage.getItem('user');
+  if (user) {
+    try {
+      return JSON.parse(user).role || 'Teacher';
+    } catch {
+      return 'Teacher';
+    }
+  }
+  return 'Teacher';
+});
+
 const currentPageTitle = computed(() => {
   const titles = {
     '/': 'Dashboard',
@@ -201,6 +284,8 @@ const currentPageTitle = computed(() => {
     '/classes': 'Classes',
     '/sections': 'Sections',
     '/holidays': 'Holidays',
+    '/profile': 'My Profile',
+    '/settings': 'Settings',
   };
   return titles[route.path] || 'Dashboard';
 });
@@ -209,7 +294,26 @@ const toggleSidebar = () => {
   sidebarCollapsed.value = !sidebarCollapsed.value;
 };
 
+const toggleProfileMenu = () => {
+  showProfileMenu.value = !showProfileMenu.value;
+};
+
+const closeProfileMenu = () => {
+  showProfileMenu.value = false;
+};
+
+const goToProfile = () => {
+  closeProfileMenu();
+  router.push('/profile');
+};
+
+const goToSettings = () => {
+  closeProfileMenu();
+  router.push('/settings');
+};
+
 const handleLogout = async () => {
+  closeProfileMenu();
   try {
     await api.post('/logout');
   } catch (error) {
@@ -219,6 +323,21 @@ const handleLogout = async () => {
     localStorage.removeItem('user');
     router.push('/login');
   }
+};
+
+// Click outside directive
+const vClickOutside = {
+  mounted(el, binding) {
+    el.clickOutsideEvent = (event) => {
+      if (!(el === event.target || el.contains(event.target))) {
+        binding.value();
+      }
+    };
+    document.addEventListener('click', el.clickOutsideEvent);
+  },
+  unmounted(el) {
+    document.removeEventListener('click', el.clickOutsideEvent);
+  },
 };
 
 onMounted(() => {
@@ -452,22 +571,214 @@ onMounted(() => {
   gap: 1.5rem;
 }
 
+.user-profile {
+  position: relative;
+}
+
 .user-info {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.625rem 1rem;
+  padding: 0.5rem 1rem;
   background: var(--bg-tertiary);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-primary);
-  font-weight: 500;
-  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
 }
 
-.user-icon {
+.user-info:hover {
+  background: var(--bg-primary);
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.user-avatar svg {
   width: 20px;
   height: 20px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.dropdown-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+  margin-left: 0.25rem;
+}
+
+.dropdown-icon.open {
+  transform: rotate(180deg);
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 280px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.dropdown-header {
+  padding: 1.25rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dropdown-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dropdown-avatar svg {
+  width: 24px;
+  height: 24px;
+  color: white;
+}
+
+.dropdown-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dropdown-name {
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 0 0 0.25rem 0;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-email {
+  font-size: 0.8125rem;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-menu {
+  padding: 0.5rem;
+}
+
+.dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: var(--bg-tertiary);
   color: var(--primary);
+}
+
+.dropdown-item svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+}
+
+.dropdown-item:hover svg {
+  color: var(--primary);
+}
+
+.dropdown-item.logout {
+  color: #ef4444;
+}
+
+.dropdown-item.logout:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.dropdown-item.logout svg {
+  color: #ef4444;
+}
+
+.dropdown-item.logout:hover svg {
+  color: #dc2626;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.5rem 0;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.dropdown-enter-to,
+.dropdown-leave-from {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .main-content {
@@ -545,6 +856,18 @@ onMounted(() => {
   
   .sidebar.collapsed {
     transform: translateX(-100%);
+  }
+  
+  .user-details {
+    display: none;
+  }
+  
+  .dropdown-icon {
+    margin-left: 0;
+  }
+  
+  .profile-dropdown {
+    right: -1rem;
   }
 }
 
