@@ -93,6 +93,11 @@ const handleLogin = async () => {
     const response = await api.post('/login', form.value);
     localStorage.setItem('auth_token', response.data.access_token);
     localStorage.setItem('user', JSON.stringify(response.data.user));
+    
+    // Dispatch a custom event to notify App.vue
+    window.dispatchEvent(new Event('auth-changed'));
+    
+    // Navigate to dashboard
     router.push('/');
   } catch (err) {
     error.value = err.response?.data?.message || 'Login failed. Please check your credentials.';

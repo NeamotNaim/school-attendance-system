@@ -4,7 +4,16 @@
       <div class="spinner"></div>
       <p>Loading chart data...</p>
     </div>
-    <canvas ref="chartCanvas" v-show="!loading"></canvas>
+    <div v-else-if="noData" class="chart-no-data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+      </svg>
+      <p>No attendance data available for this month</p>
+      <small>Record some attendance to see the chart</small>
+    </div>
+    <canvas ref="chartCanvas" v-show="!loading && !noData"></canvas>
   </div>
 </template>
 
@@ -24,27 +33,41 @@ const props = defineProps({
 
 const chartCanvas = ref(null);
 const loading = ref(false);
+const noData = ref(false);
 let chartInstance = null;
 
 const fetchChartData = async () => {
-  if (!props.month) return;
+  if (!props.month) {
+    console.log('No month provided to chart');
+    return;
+  }
 
   loading.value = true;
   try {
+    console.log('Fetching chart data for month:', props.month);
+    
     // Fetch class comparison data
     const response = await api.get('/reports/class-comparison', {
       params: { month: props.month },
     });
 
+    console.log('Full API response:', response.data);
+    
     const classData = response.data.data;
     
     console.log('Chart data received:', classData);
+    console.log('Data type:', typeof classData);
+    console.log('Is array:', Array.isArray(classData));
+    console.log('Data length:', classData?.length);
     
-    if (!classData || classData.length === 0) {
+    if (!classData || !Array.isArray(classData) || classData.length === 0) {
       console.warn('No class data available for chart');
+      noData.value = true;
       loading.value = false;
       return;
     }
+    
+    noData.value = false;
     
     // Group data by class and convert to percentages
     const labels = classData.map((c) => `Class ${c.class_name}`);
@@ -255,6 +278,8 @@ const fetchChartData = async () => {
     }
   } catch (error) {
     console.error('Failed to fetch chart data:', error);
+    console.error('Error details:', error.response?.data || error.message);
+    noData.value = true;
   } finally {
     loading.value = false;
   }
@@ -284,6 +309,37 @@ onMounted(fetchChartData);
 .chart-loading p {
   font-size: 0.9375rem;
   margin: 0;
+}
+
+.chart-no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 2rem;
+}
+
+.chart-no-data svg {
+  width: 48px;
+  height: 48px;
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.chart-no-data p {
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.chart-no-data small {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
 }
 
 .spinner {

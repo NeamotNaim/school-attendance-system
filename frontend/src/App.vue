@@ -227,7 +227,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import api from './services/api';
 import Toast from './components/Toast.vue';
@@ -238,10 +238,19 @@ const router = useRouter();
 const route = useRoute();
 const sidebarCollapsed = ref(false);
 const showProfileMenu = ref(false);
+const authToken = ref(localStorage.getItem('auth_token'));
 
 const isAuthenticated = computed(() => {
-  return !!localStorage.getItem('auth_token');
+  return !!authToken.value;
 });
+
+// Listen for auth changes
+const updateAuthState = () => {
+  authToken.value = localStorage.getItem('auth_token');
+};
+
+// Watch for route changes to update auth state
+watch(() => route.path, updateAuthState);
 
 const userName = computed(() => {
   const user = localStorage.getItem('user');
@@ -327,6 +336,10 @@ const handleLogout = async () => {
   } finally {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
+    
+    // Dispatch auth changed event
+    window.dispatchEvent(new Event('auth-changed'));
+    
     router.push('/login');
   }
 };
@@ -360,6 +373,14 @@ onMounted(() => {
       sidebarCollapsed.value = false;
     }
   });
+  
+  // Listen for auth changes from login/logout
+  window.addEventListener('auth-changed', updateAuthState);
+});
+
+// Cleanup on unmount
+onUnmounted(() => {
+  window.removeEventListener('auth-changed', updateAuthState);
 });
 </script>
 
