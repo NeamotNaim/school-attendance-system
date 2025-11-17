@@ -2,11 +2,6 @@
 
 A comprehensive full-stack attendance management system built with Laravel 12 and Vue 3, featuring real-time statistics, automated reporting, and Redis caching for optimal performance.
 
-![Laravel](https://img.shields.io/badge/Laravel-12.38-FF2D20?style=flat&logo=laravel)
-![Vue.js](https://img.shields.io/badge/Vue.js-3.5-4FC08D?style=flat&logo=vue.js)
-![PHP](https://img.shields.io/badge/PHP-8.2-777BB4?style=flat&logo=php)
-![Redis](https://img.shields.io/badge/Redis-7.0-DC382D?style=flat&logo=redis)
-
 ## 📋 Table of Contents
 
 - [Features](#features)
@@ -469,7 +464,7 @@ GET    /api/reports/low-attendance    # Low attendance students
 # Login
 curl -X POST http://localhost:8000/api/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@school.com","password":"password"}'
+  -d '{"email":"admin@example.com","password":"password"}'
 
 # Get students (with token)
 curl -X GET http://localhost:8000/api/students \
@@ -631,7 +626,7 @@ cd frontend && npm run dev
 
 # 6. Access application
 # Frontend: http://localhost:5173
-# Login: admin@school.com / password
+# Login: admin@example.com / password
 ```
 
 ### For Docker Setup
@@ -650,7 +645,7 @@ docker-compose exec app php artisan migrate:fresh --seed
 # 4. Access application
 # Frontend: http://localhost:3000
 # Backend: http://localhost:8000
-# Login: admin@school.com / password
+# Login: admin@example.com / password
 ```
 
 ---
