@@ -4,17 +4,21 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AttendanceService;
+use App\Services\AttendanceCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class ReportController extends Controller
 {
     protected AttendanceService $attendanceService;
+    protected AttendanceCacheService $cacheService;
 
-    public function __construct(AttendanceService $attendanceService)
+    public function __construct(AttendanceService $attendanceService, AttendanceCacheService $cacheService)
     {
         $this->attendanceService = $attendanceService;
+        $this->cacheService = $cacheService;
     }
 
     /**
@@ -26,7 +30,12 @@ class ReportController extends Controller
         $class = $request->get('class');
         $section = $request->get('section');
 
-        $report = $this->attendanceService->generateWeeklyReport($startDate, $class, $section);
+        // Cache weekly report for 1 hour
+        $cacheKey = "attendance:weekly:{$startDate}:" . ($class ?? 'all') . ':' . ($section ?? 'all');
+        
+        $report = Cache::remember($cacheKey, 3600, function () use ($startDate, $class, $section) {
+            return $this->attendanceService->generateWeeklyReport($startDate, $class, $section);
+        });
 
         return response()->json([
             'data' => $report,
@@ -42,7 +51,12 @@ class ReportController extends Controller
         $class = $request->get('class');
         $section = $request->get('section');
 
-        $report = $this->attendanceService->generateMonthlyReport($month, $class, $section);
+        // Cache key based on parameters
+        $cacheKey = "attendance:monthly:{$month}:" . ($class ?? 'all') . ':' . ($section ?? 'all');
+        
+        $report = Cache::remember($cacheKey, 3600, function () use ($month, $class, $section) {
+            return $this->attendanceService->generateMonthlyReport($month, $class, $section);
+        });
 
         return response()->json([
             'data' => $report,
@@ -56,31 +70,38 @@ class ReportController extends Controller
     {
         $month = $request->get('month', Carbon::now()->format('Y-m'));
         
-        $classes = \App\Models\SchoolClass::where('is_active', true)->orderBy('name')->get();
-        $comparison = [];
+        // Cache class comparison for 1 hour
+        $cacheKey = "attendance:class-comparison:{$month}";
+        
+        $comparison = Cache::remember($cacheKey, 3600, function () use ($month) {
+            $classes = \App\Models\SchoolClass::where('is_active', true)->orderBy('name')->get();
+            $result = [];
 
-        foreach ($classes as $class) {
-            // Use class name instead of ID
-            $report = $this->attendanceService->generateMonthlyReport($month, $class->name);
+            foreach ($classes as $class) {
+                // Use class name instead of ID
+                $report = $this->attendanceService->generateMonthlyReport($month, $class->name);
+                
+                $totalStudents = count($report['students']);
+                $totalPresent = array_sum(array_column($report['students'], 'present_days'));
+                $totalAbsent = array_sum(array_column($report['students'], 'absent_days'));
+                $totalDays = $totalStudents > 0 ? $report['students'][0]['total_days'] ?? 0 : 0;
+                $avgPercentage = $totalStudents > 0 
+                    ? array_sum(array_column($report['students'], 'attendance_percentage')) / $totalStudents
+                    : 0;
+
+                $result[] = [
+                    'class_id' => $class->id,
+                    'class_name' => $class->name,
+                    'total_students' => $totalStudents,
+                    'total_present' => $totalPresent,
+                    'total_absent' => $totalAbsent,
+                    'total_days' => $totalDays,
+                    'average_attendance_percentage' => round($avgPercentage, 2),
+                ];
+            }
             
-            $totalStudents = count($report['students']);
-            $totalPresent = array_sum(array_column($report['students'], 'present_days'));
-            $totalAbsent = array_sum(array_column($report['students'], 'absent_days'));
-            $totalDays = $totalStudents > 0 ? $report['students'][0]['total_days'] ?? 0 : 0;
-            $avgPercentage = $totalStudents > 0 
-                ? array_sum(array_column($report['students'], 'attendance_percentage')) / $totalStudents
-                : 0;
-
-            $comparison[] = [
-                'class_id' => $class->id,
-                'class_name' => $class->name,
-                'total_students' => $totalStudents,
-                'total_present' => $totalPresent,
-                'total_absent' => $totalAbsent,
-                'total_days' => $totalDays,
-                'average_attendance_percentage' => round($avgPercentage, 2),
-            ];
-        }
+            return $result;
+        });
 
         return response()->json([
             'month' => $month,
@@ -96,7 +117,12 @@ class ReportController extends Controller
         $threshold = (float) $request->get('threshold', 75.0);
         $month = $request->get('month', Carbon::now()->format('Y-m'));
 
-        $lowAttendance = $this->attendanceService->getLowAttendanceStudents($threshold, $month);
+        // Cache low attendance for 30 minutes
+        $cacheKey = "attendance:low:{$month}:{$threshold}";
+        
+        $lowAttendance = Cache::remember($cacheKey, 1800, function () use ($threshold, $month) {
+            return $this->attendanceService->getLowAttendanceStudents($threshold, $month);
+        });
 
         return response()->json([
             'data' => $lowAttendance,

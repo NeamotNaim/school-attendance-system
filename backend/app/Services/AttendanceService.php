@@ -11,6 +11,12 @@ use Carbon\Carbon;
 
 class AttendanceService
 {
+    protected $cacheService;
+
+    public function __construct(AttendanceCacheService $cacheService)
+    {
+        $this->cacheService = $cacheService;
+    }
     /**
      * Record bulk attendance for multiple students.
      *
@@ -394,6 +400,12 @@ class AttendanceService
     public function clearAttendanceCache(string $date): void
     {
         $month = Carbon::parse($date)->format('Y-m');
+        
+        // Use the cache service for better cache management
+        $this->cacheService->clearDate($date);
+        $this->cacheService->clearMonth($month);
+        
+        // Legacy cache keys (for backward compatibility)
         Cache::forget("attendance_stats_{$date}");
         Cache::forget("attendance_report_{$month}_all");
         

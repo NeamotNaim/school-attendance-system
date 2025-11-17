@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Services\AttendanceService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
@@ -317,53 +318,56 @@ class AttendanceController extends Controller
         $today = Carbon::today()->format('Y-m-d');
         $currentMonth = Carbon::now()->format('Y-m');
         
-        // Today's statistics
-        $todayStats = $this->attendanceService->getAttendanceStatistics($today);
+        // Cache dashboard for 5 minutes (frequently updated)
+        $cacheKey = "attendance:dashboard:{$today}";
         
-        // Weekly statistics
-        $weekStart = Carbon::now()->startOfWeek()->format('Y-m-d');
-        $weeklyReport = $this->attendanceService->generateWeeklyReport($weekStart);
-        
-        // Monthly statistics
-        $monthlyReport = $this->attendanceService->generateMonthlyReport($currentMonth);
-        
-        // Low attendance alerts
-        $lowAttendance = $this->attendanceService->getLowAttendanceStudents(75.0, $currentMonth);
-        
-        // Recent attendance (last 7 days)
-        $recentDates = [];
-        $recentStats = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i)->format('Y-m-d');
-            $stats = $this->attendanceService->getAttendanceStatistics($date);
-            $recentDates[] = $date;
-            $recentStats[] = [
-                'date' => $date,
-                'present' => $stats['present'],
-                'absent' => $stats['absent'],
-                'late' => $stats['late'],
-                'attendance_percentage' => $stats['attendance_percentage'],
-            ];
-        }
+        $dashboardData = Cache::remember($cacheKey, 300, function () use ($today, $currentMonth) {
+            // Today's statistics
+            $todayStats = $this->attendanceService->getAttendanceStatistics($today);
+            
+            // Weekly statistics
+            $weekStart = Carbon::now()->startOfWeek()->format('Y-m-d');
+            $weeklyReport = $this->attendanceService->generateWeeklyReport($weekStart);
+            
+            // Monthly statistics
+            $monthlyReport = $this->attendanceService->generateMonthlyReport($currentMonth);
+            
+            // Low attendance alerts
+            $lowAttendance = $this->attendanceService->getLowAttendanceStudents(75.0, $currentMonth);
+            
+            // Recent attendance (last 7 days)
+            $recentDates = [];
+            $recentStats = [];
+            for ($i = 6; $i >= 0; $i--) {
+                $date = Carbon::now()->subDays($i)->format('Y-m-d');
+                $stats = $this->attendanceService->getAttendanceStatistics($date);
+                $recentDates[] = $date;
+                $recentStats[] = [
+                    'date' => $date,
+                    'present' => $stats['present'],
+                    'absent' => $stats['absent'],
+                    'late' => $stats['late'],
+                    'attendance_percentage' => $stats['attendance_percentage'],
+                ];
+            }
 
-        // Class-wise summary
-        $classes = \App\Models\SchoolClass::where('is_active', true)->get();
-        $classSummary = [];
-        foreach ($classes as $class) {
-            $classStats = $this->attendanceService->getAttendanceStatistics($today);
-            $classSummary[] = [
-                'class_id' => $class->id,
-                'class_name' => $class->name,
-                'total_students' => $class->students()->count(),
-                'present_today' => Attendance::whereDate('date', $today)
-                    ->whereHas('student', fn($q) => $q->where('class_id', $class->id))
-                    ->where('status', 'present')
-                    ->count(),
-            ];
-        }
+            // Class-wise summary
+            $classes = \App\Models\SchoolClass::where('is_active', true)->get();
+            $classSummary = [];
+            foreach ($classes as $class) {
+                $classStats = $this->attendanceService->getAttendanceStatistics($today);
+                $classSummary[] = [
+                    'class_id' => $class->id,
+                    'class_name' => $class->name,
+                    'total_students' => $class->students()->count(),
+                    'present_today' => Attendance::whereDate('date', $today)
+                        ->whereHas('student', fn($q) => $q->where('class_id', $class->id))
+                        ->where('status', 'present')
+                        ->count(),
+                ];
+            }
 
-        return response()->json([
-            'data' => [
+            return [
                 'today' => $todayStats,
                 'weekly' => [
                     'summary' => [
@@ -388,7 +392,11 @@ class AttendanceController extends Controller
                     'students' => array_slice($lowAttendance['students'], 0, 10), // Top 10
                 ],
                 'class_summary' => $classSummary,
-            ],
+            ];
+        });
+
+        return response()->json([
+            'data' => $dashboardData,
         ]);
     }
 }
