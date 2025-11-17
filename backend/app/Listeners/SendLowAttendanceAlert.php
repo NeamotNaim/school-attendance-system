@@ -3,53 +3,66 @@
 namespace App\Listeners;
 
 use App\Events\LowAttendanceDetected;
-use App\Notifications\LowAttendanceNotification;
-use App\Models\User;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
+use App\Models\Notification;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
-class SendLowAttendanceAlert implements ShouldQueue
+class SendLowAttendanceAlert
 {
-    use InteractsWithQueue;
-
-    /**
-     * Create the event listener.
-     */
-    public function __construct()
-    {
-        //
-    }
-
     /**
      * Handle the event.
      */
-    public function handle(LowAttendanceDetected $event): void
+    public function handle(LowAttendanceDetected $event)
     {
         $student = $event->student;
-        
-        Log::info('Low attendance detected', [
-            'student_id' => $student->id,
-            'student_name' => $student->name,
-            'attendance_percentage' => $event->attendancePercentage,
-            'threshold' => $event->threshold,
-            'month' => $event->month,
+        $percentage = $event->attendancePercentage;
+        $threshold = $event->threshold;
+
+        // Log the low attendance alert
+        Log::warning('Low attendance detected', [
+            'student_id' => $student->student_id,
+            'name' => $student->name,
+            'class' => $student->class,
+            'section' => $student->section,
+            'attendance_percentage' => $percentage,
+            'threshold' => $threshold,
+            'period' => $event->period,
         ]);
 
-        // Notify all admin users
-        $admins = User::where('role', 'admin')->get();
-        foreach ($admins as $admin) {
-            $admin->notify(new LowAttendanceNotification(
-                $student,
-                $event->attendancePercentage,
-                $event->threshold,
-                $event->month
-            ));
-        }
+        // Create urgent in-app notification
+        Notification::create([
+            'type' => 'low_attendance_alert',
+            'title' => 'Low Attendance Alert',
+            'message' => "{$student->name} has low attendance: {$percentage}% (threshold: {$threshold}%)",
+            'data' => [
+                'student_id' => $student->id,
+                'student_name' => $student->name,
+                'class' => $student->class,
+                'section' => $student->section,
+                'percentage' => $percentage,
+                'threshold' => $threshold,
+                'period' => $event->period,
+            ],
+            'icon' => '🚨',
+            'color' => 'red',
+            'priority' => 'urgent',
+            'user_id' => null,
+        ]);
 
-        // Optionally notify guardians if email is available
-        if ($student->email && filter_var($student->email, FILTER_VALIDATE_EMAIL)) {
-            // You can add guardian notification here
-        }
+        // TODO: Send urgent notification to parents
+        // if ($student->parent_email) {
+        //     Mail::to($student->parent_email)->send(new LowAttendanceAlertMail($student, $percentage, $threshold));
+        // }
+
+        // TODO: Notify class teacher
+        // if ($student->class_teacher_email) {
+        //     Mail::to($student->class_teacher_email)->send(new LowAttendanceTeacherMail($student, $percentage));
+        // }
+
+        // TODO: Send SMS alert
+        // if ($student->parent_phone) {
+        //     $message = "ALERT: {$student->name}'s attendance is {$percentage}%, below the required {$threshold}%";
+        //     $this->sendSms($student->parent_phone, $message);
+        // }
     }
 }

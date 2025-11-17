@@ -2,22 +2,29 @@
 
 namespace App\Events;
 
+use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-
-use App\Models\Attendance;
 
 class AttendanceRecorded
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public Attendance $attendance;
+    public $attendances;
+    public $date;
+    public $class;
+    public $section;
+    public $summary;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(Attendance $attendance)
+    public function __construct($attendances, $date, $class, $section, $summary)
     {
-        $this->attendance = $attendance;
+        $this->attendances = $attendances;
+        $this->date = $date;
+        $this->class = $class;
+        $this->section = $section;
+        $this->summary = $summary;
     }
 }

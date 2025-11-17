@@ -60,9 +60,30 @@ class AttendanceService
             // Clear cache after recording
             $this->clearAttendanceCache($date);
 
-            // Dispatch event for each recorded attendance
+            // Calculate summary
+            $summary = [
+                'present' => collect($recorded)->where('status', 'present')->count(),
+                'absent' => collect($recorded)->where('status', 'absent')->count(),
+                'late' => collect($recorded)->where('status', 'late')->count(),
+                'total' => count($recorded),
+            ];
+
+            // Get class and section from first student
+            $firstStudent = Student::find($students[0]['student_id'] ?? null);
+            $class = $firstStudent->class ?? null;
+            $section = $firstStudent->section ?? null;
+
+            // Dispatch bulk attendance recorded event
+            event(new \App\Events\AttendanceRecorded($recorded, $date, $class, $section, $summary));
+
+            // Dispatch individual events for absent students
             foreach ($recorded as $attendance) {
-                event(new \App\Events\AttendanceRecorded($attendance));
+                if ($attendance->status === 'absent') {
+                    $student = Student::find($attendance->student_id);
+                    if ($student) {
+                        event(new \App\Events\StudentMarkedAbsent($student, $attendance, $date));
+                    }
+                }
             }
 
             return [
@@ -71,6 +92,7 @@ class AttendanceService
                 'errors' => count($errors),
                 'data' => $recorded,
                 'error_details' => $errors,
+                'summary' => $summary,
             ];
         } catch (\Exception $e) {
             DB::rollBack();

@@ -4,8 +4,13 @@ namespace App\Providers;
 
 use App\Events\AttendanceRecorded;
 use App\Events\LowAttendanceDetected;
+use App\Events\StudentMarkedAbsent;
+use App\Events\ReportGenerated;
 use App\Listeners\SendAttendanceNotification;
 use App\Listeners\SendLowAttendanceAlert;
+use App\Listeners\NotifyAbsentStudent;
+use App\Listeners\LogAttendanceActivity;
+use App\Listeners\NotifyReportGeneration;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -18,9 +23,16 @@ class EventServiceProvider extends ServiceProvider
     protected $listen = [
         AttendanceRecorded::class => [
             SendAttendanceNotification::class,
+            LogAttendanceActivity::class,
+        ],
+        StudentMarkedAbsent::class => [
+            NotifyAbsentStudent::class,
         ],
         LowAttendanceDetected::class => [
             SendLowAttendanceAlert::class,
+        ],
+        ReportGenerated::class => [
+            NotifyReportGeneration::class,
         ],
     ];
 

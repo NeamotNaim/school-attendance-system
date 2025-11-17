@@ -122,13 +122,15 @@ class GenerateAttendanceReport extends Command
         $progressBar->finish();
         $this->newLine(2);
 
+        $filePath = null;
+
         // Export based on format
         switch ($format) {
             case 'csv':
-                $this->exportToCsv($reportData, $month, $class, $section, $outputPath);
+                $filePath = $this->exportToCsv($reportData, $month, $class, $section, $outputPath);
                 break;
             case 'json':
-                $this->exportToJson($reportData, $month, $class, $section, $outputPath);
+                $filePath = $this->exportToJson($reportData, $month, $class, $section, $outputPath);
                 break;
             case 'table':
                 $this->displayTable($reportData);
@@ -137,6 +139,9 @@ class GenerateAttendanceReport extends Command
                 $this->error("Invalid format: {$format}. Use csv, json, or table");
                 return 1;
         }
+
+        // Dispatch report generated event
+        event(new \App\Events\ReportGenerated('monthly', $reportData, $month, $class, $section, $filePath));
 
         $this->info('Report generated successfully!');
         return 0;
@@ -190,6 +195,8 @@ class GenerateAttendanceReport extends Command
         fclose($file);
 
         $this->info("CSV report saved to: {$filename}");
+        
+        return $filename;
     }
 
     /**
@@ -217,6 +224,8 @@ class GenerateAttendanceReport extends Command
         file_put_contents($filename, json_encode($report, JSON_PRETTY_PRINT));
 
         $this->info("JSON report saved to: {$filename}");
+        
+        return $filename;
     }
 
     /**

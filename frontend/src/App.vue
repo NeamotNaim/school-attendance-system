@@ -146,6 +146,7 @@
             </button>
             <h1 class="page-title">{{ currentPageTitle }}</h1>
             <div class="header-actions">
+              <NotificationBell />
               <div class="user-profile" @click="toggleProfileMenu" v-click-outside="closeProfileMenu">
                 <div class="user-info">
                   <div class="user-avatar">
@@ -231,6 +232,7 @@ import { useRouter, useRoute } from 'vue-router';
 import api from './services/api';
 import Toast from './components/Toast.vue';
 import ConfirmDialog from './components/ConfirmDialog.vue';
+import NotificationBell from './components/NotificationBell.vue';
 
 const router = useRouter();
 const route = useRoute();

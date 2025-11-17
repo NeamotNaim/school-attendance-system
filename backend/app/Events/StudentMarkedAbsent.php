@@ -3,27 +3,26 @@
 namespace App\Events;
 
 use App\Models\Student;
+use App\Models\Attendance;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class LowAttendanceDetected
+class StudentMarkedAbsent
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $student;
-    public $attendancePercentage;
-    public $threshold;
-    public $period;
+    public $attendance;
+    public $date;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(Student $student, $attendancePercentage, $threshold = 75, $period = 'monthly')
+    public function __construct(Student $student, Attendance $attendance, $date)
     {
         $this->student = $student;
-        $this->attendancePercentage = $attendancePercentage;
-        $this->threshold = $threshold;
-        $this->period = $period;
+        $this->attendance = $attendance;
+        $this->date = $date;
     }
 }

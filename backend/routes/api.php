@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\SectionController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\HolidayController;
+use App\Http\Controllers\Api\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -53,6 +54,16 @@ Route::middleware('auth:sanctum')->group(function () {
     // Holiday routes
     Route::get('/holidays/check', [HolidayController::class, 'checkDate']);
     Route::apiResource('holidays', HolidayController::class);
+
+    // Notification routes
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+        Route::post('/clear-read', [NotificationController::class, 'clearRead']);
+        Route::delete('/{id}', [NotificationController::class, 'destroy']);
+    });
 
     // Dashboard routes
     Route::get('/dashboard/overview', [AttendanceController::class, 'dashboardOverview']);
